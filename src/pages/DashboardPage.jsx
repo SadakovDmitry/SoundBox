@@ -139,6 +139,19 @@ function ActiveBookingCard({ booking, onRefresh }) {
     }
   };
 
+  const handleLock = async () => {
+    setUnlocking(true);
+    try {
+      await api.lockCabin(booking.id);
+      toast.success('🔒 Кабинка закрыта!', { style: { background: '#1a1a2e', color: '#fff', border: '1px solid #FF5252' } });
+      onRefresh();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
   // Calculate duration in hours
   const durationHours = Math.round((end - start) / 3600000);
 
@@ -221,12 +234,14 @@ function ActiveBookingCard({ booking, onRefresh }) {
           {isActive && booking.unlocked === 1 && (
             <Button
               variant="outlined"
-              color="success"
-              startIcon={<LockOpen />}
-              fullWidth disabled
-              sx={{ borderColor: 'success.main' }}
+              color="error"
+              startIcon={<Lock />}
+              onClick={handleLock}
+              disabled={unlocking}
+              fullWidth
+              sx={{ borderColor: 'error.main' }}
             >
-              Кабинка открыта ✓
+              Закрыть кабинку
             </Button>
           )}
           {isFinished && (

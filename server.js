@@ -271,6 +271,14 @@ app.post('/api/bookings/:id/unlock', authMiddleware, (req, res) => {
   res.json({ success: true, message: 'Кабинка открыта!' });
 });
 
+app.post('/api/bookings/:id/lock', authMiddleware, (req, res) => {
+  const booking = db.prepare('SELECT * FROM bookings WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!booking) return res.status(404).json({ error: 'Бронирование не найдено' });
+
+  db.prepare('UPDATE bookings SET unlocked = 0 WHERE id = ?').run(req.params.id);
+  res.json({ success: true, message: 'Кабинка закрыта!' });
+});
+
 app.post('/api/bookings/:id/cancel', authMiddleware, (req, res) => {
   const booking = db.prepare('SELECT * FROM bookings WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
   if (!booking) return res.status(404).json({ error: 'Бронирование не найдено' });

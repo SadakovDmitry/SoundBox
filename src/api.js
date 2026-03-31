@@ -57,6 +57,12 @@ export const api = {
       headers: getHeaders(),
     }).then(handleResponse),
 
+  lockCabin: (bookingId) =>
+    fetch(`${API_URL}/bookings/${bookingId}/lock`, {
+      method: 'POST',
+      headers: getHeaders(),
+    }).then(handleResponse),
+
   cancelBooking: (bookingId) =>
     fetch(`${API_URL}/bookings/${bookingId}/cancel`, {
       method: 'POST',
