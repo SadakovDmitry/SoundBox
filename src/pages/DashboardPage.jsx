@@ -284,8 +284,8 @@ function ProfileDialog({ open, onClose, user, onUpdated }) {
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Максимум 2 МБ');
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error('Максимум 4 МБ');
       return;
     }
     const reader = new FileReader();
