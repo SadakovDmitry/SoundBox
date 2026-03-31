@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const JWT_SECRET = 'cabins-secret-key-2024';
 
 app.use(cors());
@@ -235,6 +235,13 @@ app.post('/api/bookings/:id/cancel', authMiddleware, (req, res) => {
 app.get('/api/me', authMiddleware, (req, res) => {
   const user = db.prepare('SELECT id, name, email, created_at FROM users WHERE id = ?').get(req.userId);
   res.json(user);
+});
+
+// ─── Serve Frontend (Production) ─────────────────────────────
+app.use(express.static(join(__dirname, 'dist')));
+
+app.get('*', (req, res) => {
+  res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
 // ─── Start Server ────────────────────────────────────────────
