@@ -265,6 +265,13 @@ function ActiveBookingCard({ booking, onRefresh }) {
   );
 }
 
+const getFullUrl = (path) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  const baseUrl = import.meta.env.PROD ? '' : 'http://localhost:3001';
+  return `${baseUrl}${path}`;
+};
+
 // ─── Profile Dialog ──────────────────────────────────────────
 function ProfileDialog({ open, onClose, user, onUpdated }) {
   const [name, setName] = useState('');
@@ -319,7 +326,7 @@ function ProfileDialog({ open, onClose, user, onUpdated }) {
     }
   };
 
-  const avatarUrl = user?.avatar_url;
+  const avatarUrl = getFullUrl(user?.avatar_url);
   const initials = user?.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
 
   return (
@@ -419,7 +426,7 @@ export default function DashboardPage() {
   const activeBookings = sortByProximity(mergeConsecutiveBookings(rawActive));
   const pastBookings = mergeConsecutiveBookings(rawPast);
 
-  const avatarUrl = user?.avatar_url;
+  const avatarUrl = getFullUrl(user?.avatar_url);
   const avatarInitials = user?.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
 
   return (
