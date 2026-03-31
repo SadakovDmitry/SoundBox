@@ -240,7 +240,7 @@ app.get('/api/me', authMiddleware, (req, res) => {
 // ─── Serve Frontend (Production) ─────────────────────────────
 app.use(express.static(join(__dirname, 'dist')));
 
-app.get('*', (req, res) => {
+app.use((req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
