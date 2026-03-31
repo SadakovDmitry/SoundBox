@@ -7,9 +7,9 @@ import {
 } from '@mui/material';
 import {
   ArrowBack, VolumeOff, AccessTime, LocationOn, Star, Close,
-  EventAvailable, CheckCircle,
+  EventAvailable, CheckCircle, MyLocation,
 } from '@mui/icons-material';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -92,6 +92,72 @@ function createCabinIcon(isBooked) {
     iconAnchor: [22, 22],
     popupAnchor: [0, -22],
   });
+}
+
+// ─── User Location Marker ────────────────────────────────────
+function UserLocationMarker() {
+  const [position, setPosition] = useState(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setPosition([pos.coords.latitude, pos.coords.longitude]),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  if (!position) return null;
+
+  return (
+    <>
+      <CircleMarker center={position} radius={24}
+        pathOptions={{ fillColor: '#448AFF', fillOpacity: 0.15, stroke: false }} />
+      <CircleMarker center={position} radius={8}
+        pathOptions={{ fillColor: '#448AFF', fillOpacity: 1, color: '#fff', weight: 3 }} />
+    </>
+  );
+}
+
+function FlyToUser() {
+  const map = useMap();
+
+  const handleClick = () => {
+    if (!navigator.geolocation) {
+      toast.error('Геолокация не поддерживается');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => map.flyTo([pos.coords.latitude, pos.coords.longitude], 15, { duration: 1.5 }),
+      () => toast.error('Не удалось определить местоположение'),
+      { enableHighAccuracy: true }
+    );
+  };
+
+  return (
+    <Box
+      component={motion.div}
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.2 }}
+      sx={{ position: 'absolute', top: { xs: 60, sm: 70 }, left: { xs: 12, sm: 16 }, zIndex: 1000 }}
+    >
+      <IconButton
+        onClick={handleClick}
+        sx={{
+          background: 'rgba(15, 20, 38, 0.9)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(68, 138, 255, 0.3)',
+          color: '#448AFF',
+          width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 },
+          '&:hover': { background: 'rgba(15, 20, 38, 0.95)', color: '#82B1FF' },
+        }}
+      >
+        <MyLocation sx={{ fontSize: { xs: 18, sm: 20 } }} />
+      </IconButton>
+    </Box>
+  );
 }
 
 function TimeSlotPicker({ selectedDate, cabinId, onToggle, selectedSlots }) {
@@ -424,6 +490,9 @@ export default function MapPage() {
         </Button>
       </Box>
 
+      {/* My Location Button */}
+      <FlyToUser />
+
       {/* Cabin count badge */}
       <Box
         component={motion.div}
@@ -491,6 +560,7 @@ export default function MapPage() {
             }}
           />
         ))}
+        <UserLocationMarker />
       </MapContainer>
 
       {/* Booking Modal */}

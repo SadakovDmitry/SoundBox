@@ -62,4 +62,18 @@ export const api = {
       method: 'POST',
       headers: getHeaders(),
     }).then(handleResponse),
+
+  updateProfile: (data) =>
+    fetch(`${API_URL}/profile`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    }).then(handleResponse),
+
+  uploadAvatar: (base64) =>
+    fetch(`${API_URL}/profile/avatar`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ avatar: base64 }),
+    }).then(handleResponse),
 };

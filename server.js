@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -56,6 +57,14 @@ db.exec(`
     FOREIGN KEY (cabin_id) REFERENCES cabins(id)
   );
 `);
+
+// Add profile columns if missing
+try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT'); } catch {}
+
+// Ensure uploads directory exists
+const uploadsDir = join(__dirname, 'uploads');
+if (!existsSync(uploadsDir)) mkdirSync(uploadsDir);
 
 // ─── Seed Cabins ─────────────────────────────────────────────
 const cabinCount = db.prepare('SELECT COUNT(*) as count FROM cabins').get().count;
@@ -131,6 +140,44 @@ app.post('/api/login', (req, res) => {
   const token = jwt.sign({ id: user.id, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
   res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
 });
+
+// ─── Profile Routes ──────────────────────────────────────────
+app.get('/api/me', authMiddleware, (req, res) => {
+  const user = db.prepare('SELECT id, name, email, phone, avatar_url, created_at FROM users WHERE id = ?').get(req.userId);
+  res.json(user);
+});
+
+app.put('/api/profile', authMiddleware, (req, res) => {
+  const { name, phone, email } = req.body;
+  if (!name || !email) return res.status(400).json({ error: 'Имя и email обязательны' });
+
+  // Check if email is taken by another user
+  const existing = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email, req.userId);
+  if (existing) return res.status(400).json({ error: 'Email уже занят другим пользователем' });
+
+  db.prepare('UPDATE users SET name = ?, phone = ?, email = ? WHERE id = ?').run(name, phone || null, email, req.userId);
+  const user = db.prepare('SELECT id, name, email, phone, avatar_url, created_at FROM users WHERE id = ?').get(req.userId);
+  res.json(user);
+});
+
+app.post('/api/profile/avatar', authMiddleware, (req, res) => {
+  const { avatar } = req.body; // base64 string
+  if (!avatar) return res.status(400).json({ error: 'Файл не предоставлен' });
+
+  const matches = avatar.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Неверный формат изображения' });
+
+  const ext = matches[1];
+  const data = Buffer.from(matches[2], 'base64');
+  const filename = `avatar_${req.userId}_${Date.now()}.${ext}`;
+  writeFileSync(join(uploadsDir, filename), data);
+
+  const avatarUrl = `/api/uploads/${filename}`;
+  db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(avatarUrl, req.userId);
+  res.json({ avatar_url: avatarUrl });
+});
+
+app.use('/api/uploads', express.static(uploadsDir));
 
 // ─── Cabin Routes ────────────────────────────────────────────
 app.get('/api/cabins', authMiddleware, (req, res) => {
@@ -232,10 +279,6 @@ app.post('/api/bookings/:id/cancel', authMiddleware, (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/me', authMiddleware, (req, res) => {
-  const user = db.prepare('SELECT id, name, email, created_at FROM users WHERE id = ?').get(req.userId);
-  res.json(user);
-});
 
 // ─── Serve Frontend (Production) ─────────────────────────────
 app.use(express.static(join(__dirname, 'dist')));

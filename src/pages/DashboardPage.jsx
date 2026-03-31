@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Card, CardContent, Avatar, Chip, Skeleton,
   IconButton, Collapse, Divider, LinearProgress,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField,
 } from '@mui/material';
 import {
   Map as MapIcon, History, VolumeOff, Lock, LockOpen,
   AccessTime, LocationOn, Logout, Cancel, ArrowForward,
-  Wifi, AcUnit, UsbRounded, DesktopMac,
+  Wifi, AcUnit, UsbRounded, DesktopMac, Edit, CameraAlt, Phone, Email, Person,
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -25,6 +26,53 @@ const itemVariants = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } },
 };
+
+// ─── Merge consecutive bookings for the same cabin ───────────
+function mergeConsecutiveBookings(bookings) {
+  if (!bookings.length) return [];
+  const sorted = [...bookings].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+  const merged = [];
+  let current = { ...sorted[0] };
+
+  for (let i = 1; i < sorted.length; i++) {
+    const next = sorted[i];
+    const currentEnd = new Date(current.end_time).getTime();
+    const nextStart = new Date(next.start_time).getTime();
+    // Same cabin and end touches start → merge
+    if (next.cabin_id === current.cabin_id && Math.abs(currentEnd - nextStart) < 60000) {
+      current.end_time = next.end_time;
+      // Keep unlocked if any part is unlocked
+      if (next.unlocked) current.unlocked = 1;
+      // Store merged IDs for cancellation
+      current._mergedIds = [...(current._mergedIds || [current.id]), next.id];
+    } else {
+      merged.push(current);
+      current = { ...next };
+    }
+  }
+  merged.push(current);
+  return merged;
+}
+
+// ─── Sort by proximity: active first, then upcoming by closeness ──
+function sortByProximity(bookings) {
+  const now = new Date();
+  return [...bookings].sort((a, b) => {
+    const aStart = new Date(a.start_time);
+    const aEnd = new Date(a.end_time);
+    const bStart = new Date(b.start_time);
+    const bEnd = new Date(b.end_time);
+    const aIsActive = now >= aStart && now <= aEnd;
+    const bIsActive = now >= bStart && now <= bEnd;
+
+    // Active first
+    if (aIsActive && !bIsActive) return -1;
+    if (!aIsActive && bIsActive) return 1;
+
+    // Then by start_time closeness to now
+    return Math.abs(aStart - now) - Math.abs(bStart - now);
+  });
+}
 
 function CountdownTimer({ targetDate, label }) {
   const [timeLeft, setTimeLeft] = useState('');
@@ -79,13 +127,20 @@ function ActiveBookingCard({ booking, onRefresh }) {
 
   const handleCancel = async () => {
     try {
-      await api.cancelBooking(booking.id);
+      // Cancel all merged IDs if they exist
+      const ids = booking._mergedIds || [booking.id];
+      for (const id of ids) {
+        await api.cancelBooking(id);
+      }
       toast.success('Бронирование отменено');
       onRefresh();
     } catch (err) {
       toast.error(err.message);
     }
   };
+
+  // Calculate duration in hours
+  const durationHours = Math.round((end - start) / 3600000);
 
   return (
     <Card
@@ -109,12 +164,18 @@ function ActiveBookingCard({ booking, onRefresh }) {
               <Typography variant="caption">{booking.cabin_address}</Typography>
             </Box>
           </Box>
-          <Chip
-            size="small"
-            label={isActive ? 'Сейчас' : isUpcoming ? 'Скоро' : 'Завершено'}
-            color={isActive ? 'success' : isUpcoming ? 'warning' : 'default'}
-            sx={{ fontWeight: 600 }}
-          />
+          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+            {durationHours > 1 && (
+              <Chip size="small" label={`${durationHours} ч`} variant="outlined"
+                sx={{ fontWeight: 600, borderColor: 'rgba(124,77,255,0.3)', fontSize: '0.7rem' }} />
+            )}
+            <Chip
+              size="small"
+              label={isActive ? 'Сейчас' : isUpcoming ? 'Скоро' : 'Завершено'}
+              color={isActive ? 'success' : isUpcoming ? 'warning' : 'default'}
+              sx={{ fontWeight: 600 }}
+            />
+          </Box>
         </Box>
 
         <Box sx={{ display: 'flex', gap: 2, mb: 2, color: 'text.secondary' }}>
@@ -189,12 +250,134 @@ function ActiveBookingCard({ booking, onRefresh }) {
   );
 }
 
+// ─── Profile Dialog ──────────────────────────────────────────
+function ProfileDialog({ open, onClose, user, onUpdated }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (open && user) {
+      setName(user.name || '');
+      setEmail(user.email || '');
+      setPhone(user.phone || '');
+    }
+  }, [open, user]);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Максимум 2 МБ');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const result = await api.uploadAvatar(reader.result);
+        toast.success('Фото обновлено!');
+        onUpdated();
+      } catch (err) {
+        toast.error(err.message);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = async () => {
+    if (!name.trim() || !email.trim()) {
+      toast.error('Имя и email обязательны');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.updateProfile({ name, email, phone });
+      toast.success('Профиль обновлён!');
+      onUpdated();
+      onClose();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const avatarUrl = user?.avatar_url;
+  const initials = user?.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
+        <Typography variant="h6" fontWeight={700}>Мой профиль</Typography>
+      </DialogTitle>
+      <DialogContent sx={{ textAlign: 'center', pt: 2 }}>
+        {/* Avatar */}
+        <Box sx={{ position: 'relative', display: 'inline-block', mb: 3 }}>
+          <Avatar
+            src={avatarUrl}
+            sx={{
+              width: 96, height: 96, mx: 'auto',
+              background: 'linear-gradient(135deg, #7C4DFF, #00E5FF)',
+              fontSize: '2rem', fontWeight: 700,
+            }}
+          >
+            {!avatarUrl && initials}
+          </Avatar>
+          <IconButton
+            onClick={() => fileInputRef.current?.click()}
+            sx={{
+              position: 'absolute', bottom: -4, right: -4,
+              background: 'linear-gradient(135deg, #7C4DFF, #448AFF)',
+              color: '#fff', width: 32, height: 32,
+              '&:hover': { background: '#7C4DFF' },
+            }}
+          >
+            <CameraAlt sx={{ fontSize: 16 }} />
+          </IconButton>
+          <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleAvatarChange} />
+        </Box>
+
+        {/* Fields */}
+        <TextField
+          fullWidth size="small" label="Имя" value={name}
+          onChange={(e) => setName(e.target.value)}
+          InputProps={{ startAdornment: <Person sx={{ fontSize: 18, mr: 1, color: 'text.secondary' }} /> }}
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          fullWidth size="small" label="Телефон" value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="+7 (___) ___-__-__"
+          InputProps={{ startAdornment: <Phone sx={{ fontSize: 18, mr: 1, color: 'text.secondary' }} /> }}
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          fullWidth size="small" label="Email" value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          InputProps={{ startAdornment: <Email sx={{ fontSize: 18, mr: 1, color: 'text.secondary' }} /> }}
+        />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button variant="outlined" onClick={onClose} sx={{ borderColor: 'rgba(255,255,255,0.2)' }}>
+          Отмена
+        </Button>
+        <Button variant="contained" onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const fetchBookings = async () => {
     try {
@@ -214,9 +397,14 @@ export default function DashboardPage() {
   }, []);
 
   const now = new Date();
-  const activeBookings = bookings.filter((b) => b.status === 'active' && new Date(b.end_time) > now);
-  const pastBookings = bookings.filter((b) => b.status !== 'active' || new Date(b.end_time) <= now);
+  const rawActive = bookings.filter((b) => b.status === 'active' && new Date(b.end_time) > now);
+  const rawPast = bookings.filter((b) => b.status !== 'active' || new Date(b.end_time) <= now);
 
+  // Merge consecutive and sort by proximity
+  const activeBookings = sortByProximity(mergeConsecutiveBookings(rawActive));
+  const pastBookings = mergeConsecutiveBookings(rawPast);
+
+  const avatarUrl = user?.avatar_url;
   const avatarInitials = user?.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
 
   return (
@@ -230,13 +418,27 @@ export default function DashboardPage() {
         {/* Header */}
         <Box component={motion.div} variants={itemVariants} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: { xs: 2.5, sm: 4 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2 } }}>
-            <Avatar sx={{
-              width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 },
-              background: 'linear-gradient(135deg, #7C4DFF, #00E5FF)',
-              fontWeight: 700, fontSize: { xs: '0.95rem', sm: '1.1rem' },
-            }}>
-              {avatarInitials}
-            </Avatar>
+            <Box sx={{ position: 'relative', cursor: 'pointer' }} onClick={() => setProfileOpen(true)}>
+              <Avatar
+                src={avatarUrl}
+                sx={{
+                  width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 },
+                  background: 'linear-gradient(135deg, #7C4DFF, #00E5FF)',
+                  fontWeight: 700, fontSize: { xs: '0.95rem', sm: '1.1rem' },
+                }}
+              >
+                {!avatarUrl && avatarInitials}
+              </Avatar>
+              <Box sx={{
+                position: 'absolute', bottom: -2, right: -2,
+                width: 16, height: 16, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #7C4DFF, #448AFF)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '2px solid #0A0E1A',
+              }}>
+                <Edit sx={{ fontSize: 8, color: '#fff' }} />
+              </Box>
+            </Box>
             <Box>
               <Typography variant="h6" fontWeight={700} sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>Привет, {user?.name?.split(' ')[0]}!</Typography>
               <Typography variant="caption" color="text.secondary">Личный кабинет</Typography>
@@ -369,38 +571,52 @@ export default function DashboardPage() {
               </Typography>
             ) : (
               <AnimatePresence>
-                {pastBookings.map((b, i) => (
-                  <Card
-                    key={b.id}
-                    component={motion.div}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    sx={{ mb: 1.5, opacity: 0.7 }}
-                  >
-                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box>
-                          <Typography variant="body2" fontWeight={600}>{b.cabin_name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {format(new Date(b.start_time), 'dd MMM yyyy, HH:mm', { locale: ru })} — {format(new Date(b.end_time), 'HH:mm', { locale: ru })}
-                          </Typography>
+                {pastBookings.map((b, i) => {
+                  const start = new Date(b.start_time);
+                  const end = new Date(b.end_time);
+                  const durationHours = Math.round((end - start) / 3600000);
+                  return (
+                    <Card
+                      key={b.id}
+                      component={motion.div}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      sx={{ mb: 1.5, opacity: 0.7 }}
+                    >
+                      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Box>
+                            <Typography variant="body2" fontWeight={600}>{b.cabin_name}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {format(start, 'dd MMM yyyy, HH:mm', { locale: ru })} — {format(end, 'HH:mm', { locale: ru })}
+                              {durationHours > 1 ? ` (${durationHours} ч)` : ''}
+                            </Typography>
+                          </Box>
+                          <Chip
+                            size="small"
+                            label={b.status === 'cancelled' ? 'Отменено' : 'Завершено'}
+                            color={b.status === 'cancelled' ? 'error' : 'default'}
+                            variant="outlined"
+                            sx={{ fontSize: '0.7rem' }}
+                          />
                         </Box>
-                        <Chip
-                          size="small"
-                          label={b.status === 'cancelled' ? 'Отменено' : 'Завершено'}
-                          color={b.status === 'cancelled' ? 'error' : 'default'}
-                          variant="outlined"
-                          sx={{ fontSize: '0.7rem' }}
-                        />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </AnimatePresence>
             )}
           </Box>
         </Collapse>
+
+        {/* Profile Dialog */}
+        <ProfileDialog
+          open={profileOpen}
+          onClose={() => setProfileOpen(false)}
+          user={user}
+          onUpdated={() => refreshUser && refreshUser()}
+        />
 
       </Box>
     </Box>
