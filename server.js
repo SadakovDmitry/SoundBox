@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3001;
 const JWT_SECRET = 'cabins-secret-key-2024';
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 // ─── Database Setup ──────────────────────────────────────────
 const db = new Database(join(__dirname, 'cabins.db'));
