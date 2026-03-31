@@ -490,9 +490,6 @@ export default function MapPage() {
         </Button>
       </Box>
 
-      {/* My Location Button */}
-      <FlyToUser />
-
       {/* Cabin count badge */}
       <Box
         component={motion.div}
@@ -561,6 +558,7 @@ export default function MapPage() {
           />
         ))}
         <UserLocationMarker />
+        <FlyToUser />
       </MapContainer>
 
       {/* Booking Modal */}
