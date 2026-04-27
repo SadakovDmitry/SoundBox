@@ -48,6 +48,13 @@ export const api = {
       body: JSON.stringify({ cabin_id, start_time, end_time }),
     }).then(handleResponse),
 
+  createBulkBooking: (cabin_id, slots) =>
+    fetch(`${API_URL}/bookings/bulk`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ cabin_id, slots }),
+    }).then(handleResponse),
+
   getMyBookings: () =>
     fetch(`${API_URL}/my-bookings`, { headers: getHeaders() }).then(handleResponse),
 
@@ -69,6 +76,48 @@ export const api = {
       headers: getHeaders(),
     }).then(handleResponse),
 
+  reviewBooking: (bookingId, rating, comment) =>
+    fetch(`${API_URL}/bookings/${bookingId}/review`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ rating, comment }),
+    }).then(handleResponse),
+
+  getWallet: () =>
+    fetch(`${API_URL}/wallet`, { headers: getHeaders() }).then(handleResponse),
+
+  topUpWallet: (data) =>
+    fetch(`${API_URL}/wallet/top-up`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    }).then(handleResponse),
+
+  getNotifications: () =>
+    fetch(`${API_URL}/notifications`, { headers: getHeaders() }).then(handleResponse),
+
+  getPartnerSummary: () =>
+    fetch(`${API_URL}/partner/summary`, { headers: getHeaders() }).then(handleResponse),
+
+  getAdminSummary: () =>
+    fetch(`${API_URL}/admin/summary`, { headers: getHeaders() }).then(handleResponse),
+
+  getAdminFranchiseLeads: () =>
+    fetch(`${API_URL}/admin/franchise-leads`, { headers: getHeaders() }).then(handleResponse),
+
+  updateAdminFranchiseLead: (id, data) =>
+    fetch(`${API_URL}/admin/franchise-leads/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    }).then(handleResponse),
+
+  getAdminBookings: () =>
+    fetch(`${API_URL}/admin/bookings`, { headers: getHeaders() }).then(handleResponse),
+
+  getAdminUsers: () =>
+    fetch(`${API_URL}/admin/users`, { headers: getHeaders() }).then(handleResponse),
+
   updateProfile: (data) =>
     fetch(`${API_URL}/profile`, {
       method: 'PUT',
@@ -81,5 +130,12 @@ export const api = {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ avatar: base64 }),
+    }).then(handleResponse),
+
+  submitFranchiseLead: (data) =>
+    fetch(`${API_URL}/franchise-leads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     }).then(handleResponse),
 };

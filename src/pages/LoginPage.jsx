@@ -1,21 +1,26 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
   Box, TextField, Button, Typography, Tab, Tabs, Alert, IconButton, InputAdornment,
 } from '@mui/material';
-import { Visibility, VisibilityOff, VolumeOff } from '@mui/icons-material';
+import { ArrowBack, Visibility, VisibilityOff, VolumeOff } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+
+const pseudoRandom = (seed) => {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+};
 
 function ParticleBackground() {
   const isMobile = window.innerWidth < 600;
   const particles = Array.from({ length: isMobile ? 20 : 50 }, (_, i) => ({
     id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * 4 + 1,
-    duration: Math.random() * 20 + 10,
-    delay: Math.random() * 5,
+    x: pseudoRandom(i + 1) * 100,
+    y: pseudoRandom(i + 11) * 100,
+    size: pseudoRandom(i + 21) * 4 + 1,
+    duration: pseudoRandom(i + 31) * 20 + 10,
+    delay: pseudoRandom(i + 41) * 5,
   }));
 
   return (
@@ -105,6 +110,24 @@ export default function LoginPage() {
   return (
     <Box sx={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', px: { xs: 1.5, sm: 2 }, py: { xs: 2, sm: 0 } }}>
       <ParticleBackground />
+      <Button
+        component={RouterLink}
+        to="/"
+        startIcon={<ArrowBack />}
+        sx={{
+          position: 'fixed',
+          top: { xs: 12, sm: 18 },
+          left: { xs: 12, sm: 18 },
+          zIndex: 2,
+          color: 'text.secondary',
+          background: 'rgba(15, 20, 38, 0.55)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(18px)',
+          '&:hover': { background: 'rgba(15, 20, 38, 0.82)' },
+        }}
+      >
+        Лендинг
+      </Button>
 
       <Box
         component={motion.div}

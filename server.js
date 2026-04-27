@@ -56,11 +56,50 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (cabin_id) REFERENCES cabins(id)
   );
+
+  CREATE TABLE IF NOT EXISTS franchise_leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT,
+    city TEXT NOT NULL,
+    format TEXT NOT NULL,
+    message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS wallet_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    booking_id INTEGER NOT NULL,
+    cabin_id INTEGER NOT NULL,
+    rating INTEGER NOT NULL,
+    comment TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, booking_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (booking_id) REFERENCES bookings(id),
+    FOREIGN KEY (cabin_id) REFERENCES cabins(id)
+  );
 `);
 
 // Add profile columns if missing
-try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch {}
-try { db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch { /* column may already exist */ }
+try { db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT'); } catch { /* column may already exist */ }
+try { db.exec('ALTER TABLE users ADD COLUMN balance INTEGER DEFAULT 0'); } catch { /* column may already exist */ }
+try { db.exec('ALTER TABLE bookings ADD COLUMN total_price INTEGER DEFAULT 0'); } catch { /* column may already exist */ }
+try { db.exec('ALTER TABLE franchise_leads ADD COLUMN status TEXT DEFAULT "Новая"'); } catch { /* column may already exist */ }
+try { db.exec('ALTER TABLE franchise_leads ADD COLUMN manager_note TEXT'); } catch { /* column may already exist */ }
 
 // Ensure uploads directory exists
 const uploadsDir = join(__dirname, 'uploads');
@@ -107,6 +146,64 @@ function authMiddleware(req, res, next) {
   }
 }
 
+function getPublicUser(userId) {
+  return db.prepare(`
+    SELECT id, name, email, phone, avatar_url, balance, created_at
+    FROM users
+    WHERE id = ?
+  `).get(userId);
+}
+
+function toLocalDateTime(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const pad = (number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function getCabinStatus(cabinId) {
+  const now = new Date();
+  const soon = new Date(now.getTime() + 60 * 60 * 1000);
+  const active = db.prepare(`
+    SELECT end_time FROM bookings
+    WHERE cabin_id = ? AND status = 'active'
+    AND start_time <= ? AND end_time > ?
+    ORDER BY end_time ASC
+    LIMIT 1
+  `).get(cabinId, toLocalDateTime(now), toLocalDateTime(now));
+
+  if (active) {
+    return { status: 'occupied', status_label: 'Занята', busy_until: active.end_time };
+  }
+
+  const upcoming = db.prepare(`
+    SELECT start_time FROM bookings
+    WHERE cabin_id = ? AND status = 'active'
+    AND start_time > ? AND start_time <= ?
+    ORDER BY start_time ASC
+    LIMIT 1
+  `).get(cabinId, toLocalDateTime(now), toLocalDateTime(soon));
+
+  if (upcoming) {
+    return { status: 'soon', status_label: 'Скоро бронь', next_booking_at: upcoming.start_time };
+  }
+
+  return { status: 'free', status_label: 'Свободна' };
+}
+
+function getBookingPrice(cabin, startTime, endTime) {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const minutes = Math.round((end - start) / 60000);
+  return Math.round((minutes / 60) * cabin.price_per_hour);
+}
+
+function refreshCabinRating(cabinId) {
+  const avg = db.prepare('SELECT AVG(rating) as rating FROM reviews WHERE cabin_id = ?').get(cabinId).rating;
+  if (avg) {
+    db.prepare('UPDATE cabins SET rating = ? WHERE id = ?').run(Number(avg).toFixed(1), cabinId);
+  }
+}
+
 // ─── Auth Routes ─────────────────────────────────────────────
 app.post('/api/register', (req, res) => {
   const { name, email, password } = req.body;
@@ -123,7 +220,7 @@ app.post('/api/register', (req, res) => {
   const result = db.prepare('INSERT INTO users (name, email, password) VALUES (?, ?, ?)').run(name, email, hash);
 
   const token = jwt.sign({ id: result.lastInsertRowid, name, email }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id: result.lastInsertRowid, name, email } });
+  res.json({ token, user: getPublicUser(result.lastInsertRowid) });
 });
 
 app.post('/api/login', (req, res) => {
@@ -138,12 +235,12 @@ app.post('/api/login', (req, res) => {
   }
 
   const token = jwt.sign({ id: user.id, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+  res.json({ token, user: getPublicUser(user.id) });
 });
 
 // ─── Profile Routes ──────────────────────────────────────────
 app.get('/api/me', authMiddleware, (req, res) => {
-  const user = db.prepare('SELECT id, name, email, phone, avatar_url, created_at FROM users WHERE id = ?').get(req.userId);
+  const user = getPublicUser(req.userId);
   res.json(user);
 });
 
@@ -156,7 +253,7 @@ app.put('/api/profile', authMiddleware, (req, res) => {
   if (existing) return res.status(400).json({ error: 'Email уже занят другим пользователем' });
 
   db.prepare('UPDATE users SET name = ?, phone = ?, email = ? WHERE id = ?').run(name, phone || null, email, req.userId);
-  const user = db.prepare('SELECT id, name, email, phone, avatar_url, created_at FROM users WHERE id = ?').get(req.userId);
+  const user = getPublicUser(req.userId);
   res.json(user);
 });
 
@@ -179,16 +276,81 @@ app.post('/api/profile/avatar', authMiddleware, (req, res) => {
 
 app.use('/api/uploads', express.static(uploadsDir));
 
+// ─── Wallet Routes ───────────────────────────────────────────
+app.get('/api/wallet', authMiddleware, (req, res) => {
+  const user = getPublicUser(req.userId);
+  const transactions = db.prepare(`
+    SELECT id, amount, type, description, created_at
+    FROM wallet_transactions
+    WHERE user_id = ?
+    ORDER BY created_at DESC, id DESC
+    LIMIT 20
+  `).all(req.userId);
+
+  res.json({ balance: user.balance || 0, transactions });
+});
+
+app.post('/api/wallet/top-up', authMiddleware, (req, res) => {
+  const { amount } = req.body || {};
+  const parsedAmount = Number(amount);
+
+  if (!Number.isFinite(parsedAmount) || parsedAmount < 100 || parsedAmount > 50000) {
+    return res.status(400).json({ error: 'Введите сумму от 100 до 50 000 ₽' });
+  }
+
+  const roundedAmount = Math.round(parsedAmount);
+  const topUp = db.transaction(() => {
+    db.prepare('UPDATE users SET balance = COALESCE(balance, 0) + ? WHERE id = ?').run(roundedAmount, req.userId);
+    db.prepare(`
+      INSERT INTO wallet_transactions (user_id, amount, type, description)
+      VALUES (?, ?, 'top_up', 'Пополнение кошелька')
+    `).run(req.userId, roundedAmount);
+    return getPublicUser(req.userId);
+  });
+
+  res.json({ success: true, user: topUp(), message: 'Баланс пополнен' });
+});
+
+// ─── Franchise Leads ─────────────────────────────────────────
+app.post('/api/franchise-leads', (req, res) => {
+  const { name, phone, email, city, format, message } = req.body || {};
+
+  if (!name?.trim() || !phone?.trim() || !city?.trim() || !format?.trim()) {
+    return res.status(400).json({ error: 'Имя, телефон, город и формат обязательны' });
+  }
+
+  const result = db.prepare(`
+    INSERT INTO franchise_leads (name, phone, email, city, format, message)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    name.trim(),
+    phone.trim(),
+    email?.trim() || null,
+    city.trim(),
+    format.trim(),
+    message?.trim() || null
+  );
+
+  res.json({
+    success: true,
+    leadId: result.lastInsertRowid,
+    message: 'Заявка на франшизу принята',
+  });
+});
+
 // ─── Cabin Routes ────────────────────────────────────────────
 app.get('/api/cabins', authMiddleware, (req, res) => {
-  const cabins = db.prepare('SELECT * FROM cabins').all();
+  const cabins = db.prepare('SELECT * FROM cabins').all().map((cabin) => ({
+    ...cabin,
+    ...getCabinStatus(cabin.id),
+  }));
   res.json(cabins);
 });
 
 app.get('/api/cabins/:id', authMiddleware, (req, res) => {
   const cabin = db.prepare('SELECT * FROM cabins WHERE id = ?').get(req.params.id);
   if (!cabin) return res.status(404).json({ error: 'Кабинка не найдена' });
-  res.json(cabin);
+  res.json({ ...cabin, ...getCabinStatus(cabin.id) });
 });
 
 app.get('/api/cabins/:id/bookings', authMiddleware, (req, res) => {
@@ -213,42 +375,137 @@ app.get('/api/cabins/:id/bookings', authMiddleware, (req, res) => {
 });
 
 // ─── Booking Routes ──────────────────────────────────────────
+function createPaidBookings(userId, cabinId, slots) {
+  const cabin = db.prepare('SELECT * FROM cabins WHERE id = ?').get(cabinId);
+  if (!cabin) {
+    const error = new Error('Кабинка не найдена');
+    error.status = 404;
+    throw error;
+  }
+
+  const normalizedSlots = slots.map((slot) => ({
+    start_time: slot.start_time || slot.start,
+    end_time: slot.end_time || slot.end,
+  }));
+
+  if (!normalizedSlots.length || normalizedSlots.some((slot) => !slot.start_time || !slot.end_time)) {
+    const error = new Error('Выберите дату и время');
+    error.status = 400;
+    throw error;
+  }
+
+  const now = Date.now();
+  for (const slot of normalizedSlots) {
+    const start = new Date(slot.start_time);
+    const end = new Date(slot.end_time);
+    const minutes = Math.round((end - start) / 60000);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start || end.getTime() <= now) {
+      const error = new Error('Выбран некорректный временной слот');
+      error.status = 400;
+      throw error;
+    }
+    if (minutes < 15 || minutes % 15 !== 0) {
+      const error = new Error('Длительность бронирования должна быть кратна 15 минутам');
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  const sortedSlots = [...normalizedSlots].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+  for (let i = 1; i < sortedSlots.length; i++) {
+    if (new Date(sortedSlots[i - 1].end_time) > new Date(sortedSlots[i].start_time)) {
+      const error = new Error('Выбранные интервалы пересекаются между собой');
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  const totalPrice = normalizedSlots.reduce(
+    (sum, slot) => sum + getBookingPrice(cabin, slot.start_time, slot.end_time),
+    0
+  );
+
+  return db.transaction(() => {
+    for (const slot of normalizedSlots) {
+      const overlap = db.prepare(`
+        SELECT id FROM bookings
+        WHERE cabin_id = ? AND status = 'active'
+        AND start_time < ? AND end_time > ?
+      `).get(cabinId, slot.end_time, slot.start_time);
+
+      if (overlap) {
+        const error = new Error('Один из выбранных слотов уже занят');
+        error.status = 409;
+        throw error;
+      }
+    }
+
+    const user = db.prepare('SELECT balance FROM users WHERE id = ?').get(userId);
+    const balance = user?.balance || 0;
+    if (balance < totalPrice) {
+      const error = new Error(`Недостаточно средств: нужно ${totalPrice} ₽, на балансе ${balance} ₽`);
+      error.status = 402;
+      throw error;
+    }
+
+    const bookings = normalizedSlots.map((slot) => {
+      const price = getBookingPrice(cabin, slot.start_time, slot.end_time);
+      const result = db.prepare(`
+        INSERT INTO bookings (user_id, cabin_id, start_time, end_time, total_price)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(userId, cabinId, slot.start_time, slot.end_time, price);
+
+      return db.prepare(`
+        SELECT b.*, c.name as cabin_name, c.address as cabin_address
+        FROM bookings b JOIN cabins c ON b.cabin_id = c.id
+        WHERE b.id = ?
+      `).get(result.lastInsertRowid);
+    });
+
+    db.prepare('UPDATE users SET balance = COALESCE(balance, 0) - ? WHERE id = ?').run(totalPrice, userId);
+    db.prepare(`
+      INSERT INTO wallet_transactions (user_id, amount, type, description)
+      VALUES (?, ?, 'booking', ?)
+    `).run(userId, -totalPrice, `Бронирование ${cabin.name}`);
+
+    return { bookings, totalPrice, user: getPublicUser(userId) };
+  })();
+}
+
 app.post('/api/bookings', authMiddleware, (req, res) => {
   const { cabin_id, start_time, end_time } = req.body;
   if (!cabin_id || !start_time || !end_time) {
     return res.status(400).json({ error: 'Все поля обязательны' });
   }
 
-  // Check overlap
-  const overlap = db.prepare(`
-    SELECT id FROM bookings
-    WHERE cabin_id = ? AND status = 'active'
-    AND start_time < ? AND end_time > ?
-  `).get(cabin_id, end_time, start_time);
+  try {
+    const result = createPaidBookings(req.userId, cabin_id, [{ start_time, end_time }]);
+    res.json(result.bookings[0]);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || 'Ошибка бронирования' });
+  }
+});
 
-  if (overlap) {
-    return res.status(409).json({ error: 'Это время уже занято' });
+app.post('/api/bookings/bulk', authMiddleware, (req, res) => {
+  const { cabin_id, slots } = req.body || {};
+  if (!cabin_id || !Array.isArray(slots)) {
+    return res.status(400).json({ error: 'Кабинка и слоты обязательны' });
   }
 
-  const result = db.prepare(`
-    INSERT INTO bookings (user_id, cabin_id, start_time, end_time)
-    VALUES (?, ?, ?, ?)
-  `).run(req.userId, cabin_id, start_time, end_time);
-
-  const booking = db.prepare(`
-    SELECT b.*, c.name as cabin_name, c.address as cabin_address
-    FROM bookings b JOIN cabins c ON b.cabin_id = c.id
-    WHERE b.id = ?
-  `).get(result.lastInsertRowid);
-
-  res.json(booking);
+  try {
+    res.json(createPaidBookings(req.userId, cabin_id, slots));
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || 'Ошибка бронирования' });
+  }
 });
 
 app.get('/api/my-bookings', authMiddleware, (req, res) => {
   const bookings = db.prepare(`
-    SELECT b.*, c.name as cabin_name, c.address as cabin_address, c.lat, c.lng
+    SELECT b.*, c.name as cabin_name, c.address as cabin_address, c.lat, c.lng,
+           r.rating as review_rating, r.comment as review_comment
     FROM bookings b
     JOIN cabins c ON b.cabin_id = c.id
+    LEFT JOIN reviews r ON r.booking_id = b.id AND r.user_id = b.user_id
     WHERE b.user_id = ?
     ORDER BY b.start_time DESC
   `).all(req.userId);
@@ -280,13 +537,169 @@ app.post('/api/bookings/:id/lock', authMiddleware, (req, res) => {
 });
 
 app.post('/api/bookings/:id/cancel', authMiddleware, (req, res) => {
-  const booking = db.prepare('SELECT * FROM bookings WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  const booking = db.prepare(`
+    SELECT b.*, c.name as cabin_name
+    FROM bookings b
+    JOIN cabins c ON b.cabin_id = c.id
+    WHERE b.id = ? AND b.user_id = ?
+  `).get(req.params.id, req.userId);
   if (!booking) return res.status(404).json({ error: 'Бронирование не найдено' });
+  if (booking.status !== 'active') return res.status(400).json({ error: 'Бронирование уже отменено' });
 
-  db.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = ?").run(req.params.id);
-  res.json({ success: true });
+  const refundAmount = new Date(booking.start_time) > new Date() ? (booking.total_price || 0) : 0;
+  const cancelBooking = db.transaction(() => {
+    db.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = ?").run(req.params.id);
+    if (refundAmount > 0) {
+      db.prepare('UPDATE users SET balance = COALESCE(balance, 0) + ? WHERE id = ?').run(refundAmount, req.userId);
+      db.prepare(`
+        INSERT INTO wallet_transactions (user_id, amount, type, description)
+        VALUES (?, ?, 'refund', ?)
+      `).run(req.userId, refundAmount, `Возврат за ${booking.cabin_name}`);
+    }
+    return getPublicUser(req.userId);
+  });
+
+  res.json({ success: true, refunded: refundAmount, user: cancelBooking() });
 });
 
+app.post('/api/bookings/:id/review', authMiddleware, (req, res) => {
+  const { rating, comment } = req.body || {};
+  const parsedRating = Number(rating);
+  if (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+    return res.status(400).json({ error: 'Поставьте оценку от 1 до 5' });
+  }
+
+  const booking = db.prepare(`
+    SELECT * FROM bookings
+    WHERE id = ? AND user_id = ?
+  `).get(req.params.id, req.userId);
+  if (!booking) return res.status(404).json({ error: 'Бронирование не найдено' });
+  if (booking.status !== 'active' || new Date(booking.end_time) > new Date()) {
+    return res.status(400).json({ error: 'Отзыв можно оставить после завершения бронирования' });
+  }
+
+  try {
+    db.prepare(`
+      INSERT INTO reviews (user_id, booking_id, cabin_id, rating, comment)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(req.userId, booking.id, booking.cabin_id, parsedRating, comment?.trim() || null);
+    refreshCabinRating(booking.cabin_id);
+    res.json({ success: true });
+  } catch {
+    res.status(400).json({ error: 'Отзыв уже оставлен' });
+  }
+});
+
+app.get('/api/notifications', authMiddleware, (req, res) => {
+  const now = new Date();
+  const soon = new Date(now.getTime() + 30 * 60 * 1000);
+  const user = getPublicUser(req.userId);
+  const bookings = db.prepare(`
+    SELECT b.*, c.name as cabin_name
+    FROM bookings b
+    JOIN cabins c ON b.cabin_id = c.id
+    WHERE b.user_id = ? AND b.status = 'active'
+    AND b.end_time > ?
+    ORDER BY b.start_time ASC
+    LIMIT 8
+  `).all(req.userId, toLocalDateTime(now));
+
+  const notifications = [];
+  for (const booking of bookings) {
+    const start = new Date(booking.start_time);
+    const end = new Date(booking.end_time);
+    if (start > now && start <= soon) {
+      notifications.push({
+        id: `start-${booking.id}`,
+        type: 'soon',
+        title: 'Бронирование скоро начнётся',
+        text: `${booking.cabin_name}: ${start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`,
+      });
+    }
+    if (start <= now && end > now && end <= soon) {
+      notifications.push({
+        id: `end-${booking.id}`,
+        type: 'ending',
+        title: 'Скоро закончится время',
+        text: `${booking.cabin_name}: до ${end.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`,
+      });
+    }
+  }
+  if ((user.balance || 0) < 200) {
+    notifications.push({
+      id: 'low-balance',
+      type: 'wallet',
+      title: 'Низкий баланс',
+      text: 'Пополните кошелёк перед следующим бронированием',
+    });
+  }
+
+  res.json(notifications);
+});
+
+app.get('/api/partner/summary', authMiddleware, (req, res) => {
+  const cabins = db.prepare(`
+    SELECT c.id, c.name, c.address, c.rating, c.price_per_hour,
+           COUNT(b.id) as booking_count,
+           COALESCE(SUM(CASE WHEN b.status = 'active' THEN b.total_price ELSE 0 END), 0) as revenue,
+           COALESCE(SUM(CASE WHEN b.status = 'active' THEN (julianday(b.end_time) - julianday(b.start_time)) * 24 ELSE 0 END), 0) as hours
+    FROM cabins c
+    LEFT JOIN bookings b ON b.cabin_id = c.id
+    GROUP BY c.id
+    ORDER BY revenue DESC
+  `).all();
+
+  const totals = cabins.reduce((acc, cabin) => ({
+    revenue: acc.revenue + Number(cabin.revenue || 0),
+    bookings: acc.bookings + Number(cabin.booking_count || 0),
+    hours: acc.hours + Number(cabin.hours || 0),
+  }), { revenue: 0, bookings: 0, hours: 0 });
+
+  res.json({ totals, cabins: cabins.map((cabin) => ({ ...cabin, ...getCabinStatus(cabin.id) })) });
+});
+
+app.get('/api/admin/summary', authMiddleware, (req, res) => {
+  const users = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+  const bookings = db.prepare("SELECT COUNT(*) as count FROM bookings WHERE status = 'active'").get().count;
+  const revenue = db.prepare("SELECT COALESCE(SUM(total_price), 0) as total FROM bookings WHERE status = 'active'").get().total;
+  const leads = db.prepare('SELECT COUNT(*) as count FROM franchise_leads').get().count;
+  res.json({ users, bookings, revenue, leads });
+});
+
+app.get('/api/admin/franchise-leads', authMiddleware, (req, res) => {
+  const leads = db.prepare('SELECT * FROM franchise_leads ORDER BY created_at DESC, id DESC').all();
+  res.json(leads);
+});
+
+app.patch('/api/admin/franchise-leads/:id', authMiddleware, (req, res) => {
+  const { status, manager_note } = req.body || {};
+  db.prepare('UPDATE franchise_leads SET status = COALESCE(?, status), manager_note = COALESCE(?, manager_note) WHERE id = ?')
+    .run(status || null, manager_note || null, req.params.id);
+  const lead = db.prepare('SELECT * FROM franchise_leads WHERE id = ?').get(req.params.id);
+  res.json(lead);
+});
+
+app.get('/api/admin/bookings', authMiddleware, (req, res) => {
+  const bookings = db.prepare(`
+    SELECT b.*, u.name as user_name, u.email as user_email, c.name as cabin_name
+    FROM bookings b
+    JOIN users u ON u.id = b.user_id
+    JOIN cabins c ON c.id = b.cabin_id
+    ORDER BY b.created_at DESC, b.id DESC
+    LIMIT 80
+  `).all();
+  res.json(bookings);
+});
+
+app.get('/api/admin/users', authMiddleware, (req, res) => {
+  const users = db.prepare(`
+    SELECT id, name, email, phone, balance, created_at
+    FROM users
+    ORDER BY created_at DESC, id DESC
+    LIMIT 80
+  `).all();
+  res.json(users);
+});
 
 // ─── Serve Frontend (Production) ─────────────────────────────
 app.use(express.static(join(__dirname, 'dist')));

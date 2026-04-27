@@ -6,11 +6,15 @@ import theme from './theme';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import MapPage from './pages/MapPage';
+import LandingPage from './pages/LandingPage';
+import FranchisePage from './pages/FranchisePage';
+import AdminPage from './pages/AdminPage';
+import PartnerPage from './pages/PartnerPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user) return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   return children;
 }
 
@@ -24,9 +28,13 @@ function PublicRoute({ children }) {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<PublicRoute><LoginPage /></PublicRoute>} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/franchise" element={<FranchisePage />} />
+      <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/map" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+      <Route path="/partner" element={<ProtectedRoute><PartnerPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

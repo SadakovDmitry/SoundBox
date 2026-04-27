@@ -2,19 +2,21 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Card, CardContent, Avatar, Chip, Skeleton,
-  IconButton, Collapse, Divider, LinearProgress,
+  IconButton, Collapse, Divider, Rating, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
 } from '@mui/material';
 import {
   Map as MapIcon, History, VolumeOff, Lock, LockOpen,
   AccessTime, LocationOn, Logout, Cancel, ArrowForward,
   Wifi, AcUnit, UsbRounded, DesktopMac, Edit, CameraAlt, Phone, Email, Person,
+  AccountBalanceWallet, CreditCard, NotificationsActive, AdminPanelSettings,
+  BusinessCenter, StarRate,
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
-import { format, isPast, isFuture, isWithinInterval, formatDistanceToNow } from 'date-fns';
+import { format, isPast, isFuture, isWithinInterval } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 const containerVariants = {
@@ -298,7 +300,7 @@ function ProfileDialog({ open, onClose, user, onUpdated }) {
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        const result = await api.uploadAvatar(reader.result);
+        await api.uploadAvatar(reader.result);
         toast.success('Фото обновлено!');
         onUpdated();
       } catch (err) {
@@ -393,6 +395,174 @@ function ProfileDialog({ open, onClose, user, onUpdated }) {
   );
 }
 
+function TopUpDialog({ open, onClose, onUpdated }) {
+  const [amount, setAmount] = useState('1000');
+  const [card, setCard] = useState('');
+  const [holder, setHolder] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvc, setCvc] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!amount || Number(amount) < 100) {
+      toast.error('Минимальная сумма пополнения 100 ₽');
+      return;
+    }
+    if (!card.trim() || !holder.trim() || !expiry.trim() || !cvc.trim()) {
+      toast.error('Заполните данные карты');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.topUpWallet({ amount: Number(amount), card, holder, expiry, cvc });
+      toast.success('Баланс пополнен');
+      onUpdated();
+      onClose();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>
+        <Typography variant="h6" fontWeight={700}>Пополнить кошелёк</Typography>
+        <Typography variant="caption" color="text.secondary">Демо-оплата начисляет виртуальные деньги</Typography>
+      </DialogTitle>
+      <DialogContent sx={{ pt: 1 }}>
+        <TextField fullWidth size="small" label="Сумма" type="number" value={amount}
+          onChange={(e) => setAmount(e.target.value)} sx={{ mb: 2 }} />
+        <TextField fullWidth size="small" label="Номер карты" value={card}
+          onChange={(e) => setCard(e.target.value)} placeholder="0000 0000 0000 0000" sx={{ mb: 2 }} />
+        <TextField fullWidth size="small" label="Имя на карте" value={holder}
+          onChange={(e) => setHolder(e.target.value)} sx={{ mb: 2 }} />
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+          <TextField size="small" label="ММ/ГГ" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+          <TextField size="small" label="CVC" value={cvc} onChange={(e) => setCvc(e.target.value)} />
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button variant="outlined" onClick={onClose} sx={{ borderColor: 'rgba(255,255,255,0.2)' }}>
+          Отмена
+        </Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={saving}>
+          {saving ? 'Зачисляем...' : 'Пополнить'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function WalletCard({ user, wallet, onTopUp }) {
+  return (
+    <Card component={motion.div} variants={itemVariants} sx={{ mb: { xs: 2, sm: 3 }, overflow: 'hidden' }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'flex-start', mb: 2 }}>
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary">Кошелёк SoundBox</Typography>
+            <Typography variant="h4" fontWeight={800} sx={{ color: 'secondary.main', mt: 0.5 }}>
+              {user?.balance || 0} ₽
+            </Typography>
+          </Box>
+          <Button variant="contained" startIcon={<CreditCard />} onClick={onTopUp}>
+            Пополнить
+          </Button>
+        </Box>
+        <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', mb: 1.5 }} />
+        {wallet?.transactions?.length ? (
+          wallet.transactions.slice(0, 3).map((tx) => (
+            <Box key={tx.id} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, py: 0.75 }}>
+              <Typography variant="body2" color="text.secondary">{tx.description || 'Операция'}</Typography>
+              <Typography variant="body2" fontWeight={700} sx={{ color: tx.amount > 0 ? '#00E676' : 'text.primary' }}>
+                {tx.amount > 0 ? '+' : ''}{tx.amount} ₽
+              </Typography>
+            </Box>
+          ))
+        ) : (
+          <Typography variant="body2" color="text.secondary">Пополните баланс перед первым бронированием.</Typography>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function NotificationsCard({ notifications }) {
+  if (!notifications.length) return null;
+  return (
+    <Card component={motion.div} variants={itemVariants} sx={{ mb: { xs: 2, sm: 3 } }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <NotificationsActive sx={{ fontSize: 20, color: 'secondary.main' }} />
+          Уведомления
+        </Typography>
+        {notifications.slice(0, 4).map((item) => (
+          <Alert key={item.id} severity={item.type === 'wallet' ? 'warning' : 'info'} variant="outlined" sx={{ mb: 1, borderRadius: 2 }}>
+            <Typography variant="body2" fontWeight={700}>{item.title}</Typography>
+            <Typography variant="caption" color="text.secondary">{item.text}</Typography>
+          </Alert>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReviewDialog({ booking, open, onClose, onSaved }) {
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setRating(5);
+      setComment('');
+    }
+  }, [open]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.reviewBooking(booking.id, rating, comment);
+      toast.success('Спасибо за отзыв!');
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>
+        <Typography variant="h6" fontWeight={700}>Оценить бронирование</Typography>
+        <Typography variant="caption" color="text.secondary">{booking?.cabin_name}</Typography>
+      </DialogTitle>
+      <DialogContent sx={{ pt: 1 }}>
+        <Rating value={rating} onChange={(_, value) => setRating(value || 5)} size="large" sx={{ mb: 2 }} />
+        <TextField
+          fullWidth
+          multiline
+          minRows={3}
+          label="Комментарий"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+        />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button variant="outlined" onClick={onClose} sx={{ borderColor: 'rgba(255,255,255,0.2)' }}>
+          Отмена
+        </Button>
+        <Button variant="contained" onClick={handleSave} disabled={saving}>
+          Отправить
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function DashboardPage() {
   const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -400,21 +570,52 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [wallet, setWallet] = useState({ transactions: [] });
+  const [notifications, setNotifications] = useState([]);
+  const [reviewBooking, setReviewBooking] = useState(null);
 
   const fetchBookings = async () => {
     try {
       const data = await api.getMyBookings();
       setBookings(data);
-    } catch (err) {
+    } catch {
       toast.error('Ошибка загрузки бронирований');
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchCabinetData = async () => {
+    try {
+      const [walletData, notificationsData] = await Promise.all([
+        api.getWallet(),
+        api.getNotifications(),
+      ]);
+      setWallet(walletData);
+      setNotifications(notificationsData);
+    } catch {
+      // Dashboard still works if optional widgets fail.
+    }
+  };
+
+  const refreshCabinet = async () => {
+    await Promise.all([
+      fetchBookings(),
+      fetchCabinetData(),
+      refreshUser?.(),
+    ]);
+  };
+
   useEffect(() => {
-    fetchBookings();
-    const interval = setInterval(fetchBookings, 30000);
+    queueMicrotask(() => {
+      fetchBookings();
+      fetchCabinetData();
+    });
+    const interval = setInterval(() => {
+      fetchBookings();
+      fetchCabinetData();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -466,10 +667,26 @@ export default function DashboardPage() {
               <Typography variant="caption" color="text.secondary">Личный кабинет</Typography>
             </Box>
           </Box>
-          <IconButton onClick={() => { logout(); navigate('/'); }} sx={{ color: 'text.secondary' }}>
-            <Logout />
-          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <Chip
+              icon={<AccountBalanceWallet sx={{ fontSize: 16 }} />}
+              label={`${user?.balance || 0} ₽`}
+              onClick={() => setTopUpOpen(true)}
+              sx={{
+                borderColor: 'rgba(124,77,255,0.35)',
+                color: 'secondary.main',
+                fontWeight: 700,
+              }}
+              variant="outlined"
+            />
+            <IconButton onClick={() => { logout(); navigate('/'); }} sx={{ color: 'text.secondary' }}>
+              <Logout />
+            </IconButton>
+          </Box>
         </Box>
+
+        <WalletCard user={user} wallet={wallet} onTopUp={() => setTopUpOpen(true)} />
+        <NotificationsCard notifications={notifications} />
 
         {/* Welcome Card */}
         <Card component={motion.div} variants={itemVariants} sx={{ mb: { xs: 2, sm: 3 }, overflow: 'hidden', position: 'relative' }}>
@@ -527,6 +744,24 @@ export default function DashboardPage() {
 
         {/* Book Button */}
         <Box component={motion.div} variants={itemVariants}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5, mb: { xs: 1.5, sm: 2 } }}>
+            <Button
+              variant="outlined"
+              startIcon={<AdminPanelSettings />}
+              onClick={() => navigate('/admin')}
+              sx={{ borderColor: 'rgba(124,77,255,0.3)', py: 1.2 }}
+            >
+              Панель управления
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<BusinessCenter />}
+              onClick={() => navigate('/partner')}
+              sx={{ borderColor: 'rgba(124,77,255,0.3)', py: 1.2 }}
+            >
+              Кабинет партнёра
+            </Button>
+          </Box>
           <Button
             variant="contained" fullWidth size="large"
             startIcon={<MapIcon />}
@@ -562,7 +797,7 @@ export default function DashboardPage() {
             </Typography>
             <AnimatePresence>
               {activeBookings.map((b) => (
-                <ActiveBookingCard key={b.id} booking={b} onRefresh={fetchBookings} />
+                <ActiveBookingCard key={b.id} booking={b} onRefresh={refreshCabinet} />
               ))}
             </AnimatePresence>
           </Box>
@@ -607,7 +842,7 @@ export default function DashboardPage() {
                       sx={{ mb: 1.5, opacity: 0.7 }}
                     >
                       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
                           <Box>
                             <Typography variant="body2" fontWeight={600}>{b.cabin_name}</Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -615,13 +850,22 @@ export default function DashboardPage() {
                               {durationHours > 1 ? ` (${durationHours} ч)` : ''}
                             </Typography>
                           </Box>
-                          <Chip
-                            size="small"
-                            label={b.status === 'cancelled' ? 'Отменено' : 'Завершено'}
-                            color={b.status === 'cancelled' ? 'error' : 'default'}
-                            variant="outlined"
-                            sx={{ fontSize: '0.7rem' }}
-                          />
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {b.review_rating ? (
+                              <Chip size="small" icon={<StarRate sx={{ fontSize: 14 }} />} label={`${b.review_rating}/5`} variant="outlined" sx={{ fontSize: '0.7rem' }} />
+                            ) : b.status === 'active' ? (
+                              <Button size="small" variant="outlined" onClick={() => setReviewBooking(b)} sx={{ borderColor: 'rgba(124,77,255,0.3)' }}>
+                                Оценить
+                              </Button>
+                            ) : null}
+                            <Chip
+                              size="small"
+                              label={b.status === 'cancelled' ? 'Отменено' : 'Завершено'}
+                              color={b.status === 'cancelled' ? 'error' : 'default'}
+                              variant="outlined"
+                              sx={{ fontSize: '0.7rem' }}
+                            />
+                          </Box>
                         </Box>
                       </CardContent>
                     </Card>
@@ -638,6 +882,17 @@ export default function DashboardPage() {
           onClose={() => setProfileOpen(false)}
           user={user}
           onUpdated={() => refreshUser && refreshUser()}
+        />
+        <TopUpDialog
+          open={topUpOpen}
+          onClose={() => setTopUpOpen(false)}
+          onUpdated={refreshCabinet}
+        />
+        <ReviewDialog
+          open={Boolean(reviewBooking)}
+          booking={reviewBooking}
+          onClose={() => setReviewBooking(null)}
+          onSaved={refreshCabinet}
         />
 
       </Box>

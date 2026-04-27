@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo, forwardRef } from 'react';
-import { useMediaQuery, useTheme } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, IconButton, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, Chip, Rating, Skeleton, Divider, Alert,
+  DialogActions, Chip, Rating, Skeleton, Divider, Alert,
 } from '@mui/material';
 import {
-  ArrowBack, VolumeOff, AccessTime, LocationOn, Star, Close,
-  EventAvailable, CheckCircle, MyLocation,
+  ArrowBack, VolumeOff, AccessTime, LocationOn, Close,
+  EventAvailable, CheckCircle, MyLocation, AccountBalanceWallet,
 } from '@mui/icons-material';
 import { MapContainer, TileLayer, Marker, Popup, useMap, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
@@ -15,7 +14,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import confetti from 'canvas-confetti';
 import { api } from '../api';
-import { format, addHours, setHours, setMinutes, startOfDay, isBefore, parseISO } from 'date-fns';
+import { useAuth } from '../context/AuthContext';
+import { format, addDays, addMinutes, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import 'leaflet/dist/leaflet.css';
 
@@ -59,18 +59,30 @@ const MotionTransition = forwardRef(function MotionTransition(props, ref) {
   );
 });
 
-function createCabinIcon(isBooked) {
+function createCabinIcon(status = 'free') {
+  const palette = {
+    free: {
+      background: 'linear-gradient(135deg, #7C4DFF, #448AFF)',
+      shadow: '0 4px 20px rgba(124,77,255,0.5)',
+    },
+    soon: {
+      background: 'linear-gradient(135deg, #FFD740, #FF9100)',
+      shadow: '0 4px 20px rgba(255, 215, 64, 0.45)',
+    },
+    occupied: {
+      background: 'linear-gradient(135deg, #FF5252, #FF1744)',
+      shadow: '0 4px 20px rgba(255,82,82,0.5)',
+    },
+  };
+  const colors = palette[status] || palette.free;
+
   return L.divIcon({
     html: `
       <div style="
         width: 44px; height: 44px; border-radius: 50%;
-        background: ${isBooked
-        ? 'linear-gradient(135deg, #FF5252, #FF1744)'
-        : 'linear-gradient(135deg, #7C4DFF, #448AFF)'};
+        background: ${colors.background};
         display: flex; align-items: center; justify-content: center;
-        box-shadow: ${isBooked
-        ? '0 4px 20px rgba(255,82,82,0.5)'
-        : '0 4px 20px rgba(124,77,255,0.5)'};
+        box-shadow: ${colors.shadow};
         border: 3px solid rgba(255,255,255,0.9);
         cursor: pointer;
         animation: marker-pulse 2s infinite;
@@ -160,83 +172,247 @@ function FlyToUser() {
   );
 }
 
-function TimeSlotPicker({ selectedDate, cabinId, onToggle, selectedSlots }) {
+function formatDuration(minutes) {
+  if (minutes < 60) return `${minutes} мин`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
+}
+
+function BookingTimePicker({ selectedDate, cabinId, onIntervalChange }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState({ startIndex: null, endIndex: null });
 
   useEffect(() => {
     if (!selectedDate) return;
-    setLoading(true);
-    api.getCabinBookings(cabinId, selectedDate)
-      .then(setBookings)
-      .catch(() => toast.error('Ошибка загрузки слотов'))
+    queueMicrotask(() => {
+      setLoading(true);
+      setRange({ startIndex: null, endIndex: null });
+      onIntervalChange(null);
+    });
+    const nextDate = format(addDays(parseISO(selectedDate), 1), 'yyyy-MM-dd');
+    Promise.all([
+      api.getCabinBookings(cabinId, selectedDate),
+      api.getCabinBookings(cabinId, nextDate),
+    ])
+      .then(([today, tomorrow]) => setBookings([...today, ...tomorrow]))
+      .catch(() => toast.error('Ошибка загрузки свободного времени'))
       .finally(() => setLoading(false));
-  }, [cabinId, selectedDate]);
+  }, [cabinId, onIntervalChange, selectedDate]);
 
   const slots = useMemo(() => {
-    const result = [];
-    const day = startOfDay(parseISO(selectedDate));
+    const day = parseISO(selectedDate);
     const now = new Date();
-    for (let h = 8; h < 22; h++) {
-      const start = setMinutes(setHours(day, h), 0);
-      const end = addHours(start, 1);
-      const isPast = isBefore(start, now);
+    return Array.from({ length: 48 }, (_, index) => {
+      const start = addMinutes(day, index * 30);
+      const end = addMinutes(start, 30);
+      const isFinished = end <= now;
+      const isCurrent = start <= now && end > now;
       const isBooked = bookings.some((b) => {
         const bs = new Date(b.start_time);
         const be = new Date(b.end_time);
         return start < be && end > bs;
       });
-      result.push({
-        start: start.toISOString(),
-        end: end.toISOString(),
-        label: `${String(h).padStart(2, '0')}:00 — ${String(h + 1).padStart(2, '0')}:00`,
-        hour: h,
-        isPast,
+      return {
+        index,
+        start,
+        end,
+        label: format(start, 'HH:mm'),
+        caption: format(end, 'HH:mm'),
+        isFinished,
+        isCurrent,
         isBooked,
-        bookedBy: isBooked ? bookings.find((b) => {
-          const bs = new Date(b.start_time);
-          const be = new Date(b.end_time);
-          return start < be && end > bs;
-        })?.user_name : null,
-      });
-    }
-    return result;
+      };
+    });
   }, [bookings, selectedDate]);
 
-  if (loading) return <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>{Array.from({ length: 14 }).map((_, i) => <Skeleton key={i} variant="rounded" width={100} height={40} sx={{ borderRadius: 2, flex: { xs: '1 1 calc(50% - 8px)', sm: '0 0 auto' } }} />)}</Box>;
+  const selectedInterval = useMemo(() => {
+    if (range.startIndex === null || range.endIndex === null) return null;
+    const startSlot = slots[range.startIndex];
+    const endSlot = slots[range.endIndex];
+    if (!startSlot || !endSlot || range.endIndex < range.startIndex) return null;
+
+    const start = startSlot.start;
+    const end = endSlot.end;
+    const minutes = Math.round((end - start) / 60000);
+    const selectedSlots = slots.slice(range.startIndex, range.endIndex + 1);
+    const hasConflict = selectedSlots.some((slot) => slot.isBooked);
+    const isFinished = end <= new Date();
+    const isValidDuration = minutes >= 30 && minutes % 30 === 0;
+
+    return {
+      start,
+      end,
+      durationMinutes: minutes,
+      hasConflict,
+      isFinished,
+      isValidDuration,
+      canBook: !isFinished && isValidDuration && !hasConflict,
+      endValue: format(end, "yyyy-MM-dd'T'HH:mm:ss"),
+      startValue: format(start, "yyyy-MM-dd'T'HH:mm:ss"),
+      label: `${format(start, 'HH:mm')} — ${format(end, 'HH:mm')}`,
+    };
+  }, [range.endIndex, range.startIndex, slots]);
+
+  useEffect(() => {
+    onIntervalChange(selectedInterval);
+  }, [onIntervalChange, selectedInterval]);
+
+  const handleSlotClick = (slot) => {
+    if (slot.isFinished || slot.isBooked) return;
+
+    setRange((prev) => {
+      if (prev.startIndex === null || prev.endIndex !== null || slot.index < prev.startIndex) {
+        return { startIndex: slot.index, endIndex: null };
+      }
+      return { startIndex: prev.startIndex, endIndex: slot.index };
+    });
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(3, 1fr)', sm: 'repeat(6, 1fr)' }, gap: 0.75 }}>
+        {Array.from({ length: 18 }).map((_, i) => (
+          <Skeleton key={i} variant="rounded" height={48} sx={{ borderRadius: 2 }} />
+        ))}
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 0.75, sm: 1 } }}>
-      {slots.map((slot) => {
-        const isSelected = selectedSlots.some(s => s.start === slot.start);
+    <Box>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+        Нажмите первый 30-минутный слот как начало, затем второй слот как конец диапазона.
+      </Typography>
+      <Box sx={{ maxHeight: 260, overflowY: 'auto', pr: 0.5 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(3, 1fr)', sm: 'repeat(6, 1fr)' }, gap: 0.75 }}>
+          {slots.map((slot) => {
+            const isStart = range.startIndex === slot.index;
+            const isEnd = range.endIndex === slot.index;
+            const inRange = range.startIndex !== null && range.endIndex !== null && slot.index >= range.startIndex && slot.index <= range.endIndex;
+            const disabled = slot.isFinished || slot.isBooked;
+            return (
+              <Button
+                key={slot.index}
+                onClick={() => handleSlotClick(slot)}
+                disabled={disabled}
+                component={motion.button}
+                whileHover={!disabled ? { scale: 1.03 } : {}}
+                sx={{
+                  minWidth: 0,
+                  height: 52,
+                  borderRadius: 2,
+                  flexDirection: 'column',
+                  lineHeight: 1.1,
+                  color: isStart || isEnd || inRange ? '#fff' : 'text.primary',
+                  opacity: slot.isFinished ? 0.32 : 1,
+                  background: isStart || isEnd
+                    ? 'linear-gradient(135deg, #7C4DFF, #448AFF)'
+                    : inRange
+                      ? 'rgba(124,77,255,0.24)'
+                      : slot.isBooked
+                        ? 'rgba(255,82,82,0.16)'
+                        : slot.isCurrent
+                          ? 'rgba(212,255,104,0.14)'
+                          : 'rgba(255,255,255,0.05)',
+                  border: slot.isBooked
+                    ? '1px solid rgba(255,82,82,0.28)'
+                    : slot.isCurrent
+                      ? '1px solid rgba(212,255,104,0.42)'
+                      : '1px solid rgba(255,255,255,0.1)',
+                  '&:hover': {
+                    background: disabled ? undefined : 'rgba(124,77,255,0.2)',
+                  },
+                  '&.Mui-disabled': {
+                    color: slot.isBooked ? '#FF8A80' : 'rgba(255,255,255,0.36)',
+                  },
+                }}
+              >
+                <Typography variant="body2" fontWeight={900}>{slot.label}</Typography>
+                <Typography variant="caption" sx={{ opacity: 0.72 }}>{slot.caption}</Typography>
+              </Button>
+            );
+          })}
+        </Box>
+      </Box>
+
+      {selectedInterval && (
+        <Alert
+          severity={selectedInterval.canBook ? 'success' : 'warning'}
+          variant="outlined"
+          sx={{ mt: 2, borderRadius: 2 }}
+        >
+          {selectedInterval.isFinished && 'Выбранный интервал уже закончился.'}
+          {!selectedInterval.isFinished && selectedInterval.hasConflict && 'В выбранном диапазоне есть занятый слот. Выберите другой промежуток.'}
+          {selectedInterval.canBook && `Интервал свободен: ${selectedInterval.label}, ${formatDuration(selectedInterval.durationMinutes)}`}
+        </Alert>
+      )}
+    </Box>
+  );
+}
+
+function DateStrip({ value, onChange }) {
+  const days = useMemo(() => Array.from({ length: 10 }, (_, index) => {
+    const date = addDays(new Date(), index);
+    const iso = format(date, 'yyyy-MM-dd');
+    return {
+      iso,
+      day: format(date, 'd', { locale: ru }),
+      weekday: format(date, 'EEE', { locale: ru }).replace('.', ''),
+      label: index === 0 ? 'Сегодня' : index === 1 ? 'Завтра' : format(date, 'd MMM', { locale: ru }),
+    };
+  }), []);
+
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridAutoFlow: 'column',
+        gridAutoColumns: { xs: '96px', sm: '108px' },
+        gap: 1,
+        overflowX: 'auto',
+        pb: 1,
+        mb: 2,
+        scrollbarWidth: 'thin',
+      }}
+    >
+      {days.map((day) => {
+        const selected = value === day.iso;
         return (
-          <Chip
-            key={slot.hour}
-            label={slot.label}
-            onClick={() => !slot.isBooked && !slot.isPast && onToggle(slot)}
-            component={motion.div}
-            whileHover={!slot.isBooked && !slot.isPast ? { scale: 1.05 } : {}}
-            whileTap={!slot.isBooked && !slot.isPast ? { scale: 0.95 } : {}}
+          <Button
+            key={day.iso}
+            onClick={() => onChange(day.iso)}
+            variant={selected ? 'contained' : 'outlined'}
             sx={{
-              px: { xs: 0.5, sm: 1 }, py: 2.5, fontSize: { xs: '0.7rem', sm: '0.8rem' }, fontWeight: 600, flex: { xs: '1 1 calc(50% - 6px)', sm: '0 0 auto' }, minWidth: { xs: 0, sm: 'auto' },
-              cursor: slot.isBooked || slot.isPast ? 'not-allowed' : 'pointer',
-              opacity: slot.isPast ? 0.3 : 1,
-              background: isSelected
-                ? 'linear-gradient(135deg, #7C4DFF, #448AFF)'
-                : slot.isBooked
-                  ? 'rgba(255, 82, 82, 0.15)'
-                  : 'rgba(255,255,255,0.05)',
-              color: isSelected ? '#fff' : slot.isBooked ? '#FF5252' : 'text.primary',
-              border: isSelected
-                ? '1px solid #7C4DFF'
-                : slot.isBooked
-                  ? '1px solid rgba(255,82,82,0.3)'
-                  : '1px solid rgba(255,255,255,0.1)',
+              minWidth: 0,
+              height: 74,
+              borderRadius: 3,
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              px: 1.5,
+              py: 1,
+              background: selected ? 'linear-gradient(135deg, #7C4DFF, #448AFF)' : 'rgba(255,255,255,0.04)',
+              borderColor: selected ? 'transparent' : 'rgba(124,77,255,0.28)',
+              boxShadow: selected ? '0 12px 28px rgba(124,77,255,0.28)' : 'none',
+              color: '#fff',
               '&:hover': {
-                background: slot.isBooked || slot.isPast ? undefined : 'rgba(124, 77, 255, 0.2)',
+                background: selected ? 'linear-gradient(135deg, #7C4DFF, #448AFF)' : 'rgba(124,77,255,0.12)',
               },
             }}
-          />
+          >
+            <Typography variant="caption" sx={{ color: selected ? 'rgba(255,255,255,0.8)' : 'text.secondary', textTransform: 'none' }}>
+              {day.label}
+            </Typography>
+            <Typography variant="h6" fontWeight={800} lineHeight={1.1}>
+              {day.day}
+            </Typography>
+            <Typography variant="caption" sx={{ color: selected ? 'rgba(255,255,255,0.75)' : 'secondary.main', textTransform: 'uppercase' }}>
+              {day.weekday}
+            </Typography>
+          </Button>
         );
       })}
     </Box>
@@ -244,53 +420,59 @@ function TimeSlotPicker({ selectedDate, cabinId, onToggle, selectedSlots }) {
 }
 
 function BookingModal({ open, cabin, onClose, onBooked }) {
+  const { user, refreshUser } = useAuth();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [selectedSlots, setSelectedSlots] = useState([]);
+  const [selectedInterval, setSelectedInterval] = useState(null);
   const [booking, setBooking] = useState(false);
 
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
       setSelectedDate(format(new Date(), 'yyyy-MM-dd'));
-      setSelectedSlots([]);
+      setSelectedInterval(null);
     }
   }, [open]);
 
   const amenities = cabin ? JSON.parse(cabin.amenities || '[]') : [];
 
-  const handleToggleSlot = (slot) => {
-    setSelectedSlots(prev => {
-      const exists = prev.some(s => s.start === slot.start);
-      if (exists) {
-        return prev.filter(s => s.start !== slot.start);
-      }
-      return [...prev, { start: slot.start, end: slot.end }].sort(
-        (a, b) => new Date(a.start) - new Date(b.start)
-      );
-    });
-  };
-
-  const totalHours = selectedSlots.length;
-  const totalPrice = totalHours * (cabin?.price_per_hour || 200);
+  const billableMinutes = selectedInterval?.durationMinutes || 0;
+  const totalPrice = Math.round((billableMinutes / 60) * (cabin?.price_per_hour || 200));
+  const balance = user?.balance || 0;
+  const canBook = Boolean(selectedInterval?.canBook);
+  const notEnoughMoney = canBook && balance < totalPrice;
 
   const handleBook = async () => {
-    if (selectedSlots.length === 0) {
-      toast.error('Выберите хотя бы один слот');
+    if (!selectedInterval) {
+      toast.error('Выберите начало и конец бронирования');
+      return;
+    }
+    if (!selectedInterval.isValidDuration) {
+      toast.error('Длительность должна быть кратна 30 минутам');
+      return;
+    }
+    if (selectedInterval?.isFinished) {
+      toast.error('Выбранный интервал уже закончился');
+      return;
+    }
+    if (selectedInterval?.hasConflict) {
+      toast.error('Выбранный интервал пересекается с другой бронью');
+      return;
+    }
+    if (notEnoughMoney) {
+      toast.error('Недостаточно средств. Пополните кошелёк в личном кабинете');
       return;
     }
     setBooking(true);
     try {
-      for (const slot of selectedSlots) {
-        await api.createBooking(cabin.id, slot.start, slot.end);
-      }
+      await api.createBulkBooking(cabin.id, [{ start: selectedInterval.startValue, end: selectedInterval.endValue }]);
+      await refreshUser?.();
       confetti({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 },
         colors: ['#7C4DFF', '#00E5FF', '#00E676', '#FFD740'],
       });
-      const word = totalHours === 1 ? 'слот' : totalHours < 5 ? 'слота' : 'слотов';
-      toast.success(`🎉 Забронировано ${totalHours} ${word}!`, {
+      toast.success(`🎉 Забронировано на ${formatDuration(selectedInterval.durationMinutes)}!`, {
         style: { background: '#1a1a2e', color: '#fff', border: '1px solid #7C4DFF' },
         duration: 4000,
       });
@@ -315,6 +497,7 @@ function BookingModal({ open, cabin, onClose, onBooked }) {
       maxWidth="sm"
       fullWidth
       fullScreen={window.innerWidth < 600}
+      scroll="paper"
       TransitionComponent={MotionTransition}
       PaperProps={{
         component: motion.div,
@@ -322,7 +505,13 @@ function BookingModal({ open, cabin, onClose, onBooked }) {
         animate: { opacity: 1, y: 0, scale: 1 },
         exit: { opacity: 0, y: 40, scale: 0.95 },
         transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] },
-        ...(window.innerWidth < 600 ? { sx: { background: 'rgba(10, 14, 26, 0.98)', borderRadius: 0 } } : {}),
+        sx: {
+          maxHeight: { xs: '100dvh', sm: 'calc(100dvh - 48px)' },
+          display: 'flex',
+          overflow: 'hidden',
+          background: 'rgba(10, 14, 26, 0.98)',
+          ...(window.innerWidth < 600 ? { borderRadius: 0 } : {}),
+        },
       }}
     >
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: { xs: 2, sm: 3 }, pt: { xs: 2, sm: 2 } }}>
@@ -336,7 +525,16 @@ function BookingModal({ open, cabin, onClose, onBooked }) {
         <IconButton onClick={() => onClose(false)} size="small"><Close /></IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ pt: 1, px: { xs: 2, sm: 3 } }}>
+      <DialogContent
+        dividers
+        sx={{
+          pt: 1,
+          px: { xs: 2, sm: 3 },
+          overflowY: 'auto',
+          borderColor: 'rgba(255,255,255,0.08)',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
         {/* Description */}
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {cabin.description}
@@ -367,32 +565,29 @@ function BookingModal({ open, cabin, onClose, onBooked }) {
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
           <EventAvailable sx={{ fontSize: 18, color: 'primary.main' }} /> Выберите дату
         </Typography>
-        <TextField
-          type="date"
-          fullWidth
-          size="small"
+        <DateStrip
           value={selectedDate}
-          onChange={(e) => { setSelectedDate(e.target.value); setSelectedSlots([]); }}
-          inputProps={{ min: format(new Date(), 'yyyy-MM-dd') }}
-          sx={{ mb: 2 }}
+          onChange={(date) => {
+            setSelectedDate(date);
+            setSelectedInterval(null);
+          }}
         />
 
-        {/* Time Slots */}
+        {/* Time Selection */}
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
           <AccessTime sx={{ fontSize: 18, color: 'primary.main' }} /> Выберите время
         </Typography>
         <Alert severity="info" variant="outlined" sx={{ mb: 2, borderRadius: 2, '& .MuiAlert-icon': { color: 'primary.main' } }}>
-          <Typography variant="caption">🔴 Занято другими пользователями &nbsp; 🟣 Ваш выбор &nbsp; Можно выбрать несколько слотов</Typography>
+          <Typography variant="caption">Сначала нажмите слот начала, затем слот конца. Каждый слот длится 30 минут; текущий свободный слот тоже доступен для бронирования.</Typography>
         </Alert>
-        <TimeSlotPicker
+        <BookingTimePicker
           selectedDate={selectedDate}
           cabinId={cabin.id}
-          onToggle={handleToggleSlot}
-          selectedSlots={selectedSlots}
+          onIntervalChange={setSelectedInterval}
         />
 
         {/* Selected summary */}
-        {selectedSlots.length > 0 && (
+        {canBook && (
           <Box sx={{
             mt: 2, p: 1.5, borderRadius: 2,
             background: 'rgba(124, 77, 255, 0.1)',
@@ -400,7 +595,7 @@ function BookingModal({ open, cabin, onClose, onBooked }) {
           }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="body2" color="text.secondary">
-                Выбрано: <strong style={{ color: '#B388FF' }}>{totalHours} {totalHours === 1 ? 'час' : totalHours < 5 ? 'часа' : 'часов'}</strong>
+                Выбрано: <strong style={{ color: '#B388FF' }}>{selectedInterval.label}, {formatDuration(selectedInterval.durationMinutes)}</strong>
               </Typography>
               <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'secondary.main' }}>
                 {totalPrice} ₽
@@ -408,20 +603,46 @@ function BookingModal({ open, cabin, onClose, onBooked }) {
             </Box>
           </Box>
         )}
+        {notEnoughMoney && (
+          <Alert severity="warning" variant="outlined" sx={{ mt: 2, borderRadius: 2 }}>
+            На балансе {balance} ₽. Пополните кошелёк в личном кабинете, чтобы завершить бронирование.
+          </Alert>
+        )}
       </DialogContent>
 
-      <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 3 }, flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, '& > button': { width: { xs: '100%', sm: 'auto' } } }}>
+      <DialogActions sx={{
+        px: { xs: 2, sm: 3 },
+        py: { xs: 1.5, sm: 2 },
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: { xs: 1, sm: 0 },
+        alignItems: { xs: 'stretch', sm: 'center' },
+        background: 'rgba(10, 14, 26, 0.98)',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        '& > button': { width: { xs: '100%', sm: 'auto' } },
+      }}>
+        <Chip
+          icon={<AccountBalanceWallet sx={{ fontSize: 16 }} />}
+          label={`Баланс: ${balance} ₽`}
+          variant="outlined"
+          sx={{
+            mr: { xs: 0, sm: 'auto' },
+            borderColor: 'rgba(124,77,255,0.35)',
+            color: 'text.secondary',
+            justifyContent: 'flex-start',
+            width: { xs: '100%', sm: 'auto' },
+          }}
+        />
         <Button variant="outlined" onClick={() => onClose(false)} sx={{ borderColor: 'rgba(255,255,255,0.2)' }}>
           Отмена
         </Button>
         <Button
-          variant="contained" onClick={handleBook} disabled={booking || selectedSlots.length === 0}
+          variant="contained" onClick={handleBook} disabled={booking || !canBook || notEnoughMoney}
           component={motion.button}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           startIcon={<CheckCircle />}
         >
-          {booking ? 'Бронирование...' : selectedSlots.length > 1 ? `Забронировать ${selectedSlots.length} слота` : 'Забронировать'}
+          {booking ? 'Бронирование...' : 'Забронировать'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -430,8 +651,8 @@ function BookingModal({ open, cabin, onClose, onBooked }) {
 
 export default function MapPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [cabins, setCabins] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCabin, setSelectedCabin] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -441,12 +662,12 @@ export default function MapPage() {
       setCabins(data);
     } catch {
       toast.error('Ошибка загрузки кабинок');
-    } finally {
-      setLoading(false);
     }
   };
 
-  useEffect(() => { fetchCabins(); }, []);
+  useEffect(() => {
+    queueMicrotask(fetchCabins);
+  }, []);
 
   const handleMarkerClick = (cabin) => {
     setSelectedCabin(cabin);
@@ -490,23 +711,46 @@ export default function MapPage() {
         </Button>
       </Box>
 
-      {/* Cabin count badge */}
+      {/* Header badges */}
       <Box
         component={motion.div}
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         sx={{
           position: 'absolute', top: { xs: 12, sm: 16 }, right: { xs: 12, sm: 16 }, zIndex: 1000,
+          display: 'flex',
+          gap: 1,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end',
+        }}
+      >
+        <Box
+          sx={{
           background: 'rgba(15, 20, 38, 0.9)',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(124, 77, 255, 0.2)',
           borderRadius: 2, px: { xs: 1.5, sm: 2 }, py: { xs: 0.5, sm: 0.75 },
-        }}
-      >
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <LocationOn sx={{ fontSize: 14, color: 'primary.main' }} />
-          {cabins.length} кабинок
-        </Typography>
+          }}
+        >
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <AccountBalanceWallet sx={{ fontSize: 14, color: 'secondary.main' }} />
+            {user?.balance || 0} ₽
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            background: 'rgba(15, 20, 38, 0.9)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(124, 77, 255, 0.2)',
+            borderRadius: 2, px: { xs: 1.5, sm: 2 }, py: { xs: 0.5, sm: 0.75 },
+          }}
+        >
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <LocationOn sx={{ fontSize: 14, color: 'primary.main' }} />
+            {cabins.length} кабинок
+          </Typography>
+        </Box>
       </Box>
 
       {/* Legend */}
@@ -531,6 +775,10 @@ export default function MapPage() {
           <Typography variant="caption" color="text.secondary">Свободна</Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ width: 12, height: 12, borderRadius: '50%', background: 'linear-gradient(135deg, #FFD740, #FF9100)' }} />
+          <Typography variant="caption" color="text.secondary">Скоро бронь</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Box sx={{ width: 12, height: 12, borderRadius: '50%', background: 'linear-gradient(135deg, #FF5252, #FF1744)' }} />
           <Typography variant="caption" color="text.secondary">Занята</Typography>
         </Box>
@@ -551,7 +799,7 @@ export default function MapPage() {
           <Marker
             key={cabin.id}
             position={[cabin.lat, cabin.lng]}
-            icon={createCabinIcon(false)}
+            icon={createCabinIcon(cabin.status)}
             eventHandlers={{
               click: () => handleMarkerClick(cabin),
             }}
