@@ -512,6 +512,7 @@ function ReviewDialog({ booking, open, onClose, onSaved }) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
+  const isAutoPrompt = Boolean(booking?.autoPrompt);
 
   useEffect(() => {
     if (open) {
@@ -537,7 +538,14 @@ function ReviewDialog({ booking, open, onClose, onSaved }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" fontWeight={700}>Оценить бронирование</Typography>
+        <Typography variant="h6" fontWeight={700}>
+          {isAutoPrompt ? 'Как прошла бронь?' : 'Оценить бронирование'}
+        </Typography>
+        {isAutoPrompt && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Бронирование завершилось. Оставьте оценку, чтобы мы могли улучшать кабинки.
+          </Typography>
+        )}
         <Typography variant="caption" color="text.secondary">{booking?.cabin_name}</Typography>
       </DialogTitle>
       <DialogContent sx={{ pt: 1 }}>
@@ -553,7 +561,7 @@ function ReviewDialog({ booking, open, onClose, onSaved }) {
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3 }}>
         <Button variant="outlined" onClick={onClose} sx={{ borderColor: 'rgba(255,255,255,0.2)' }}>
-          Отмена
+          Позже
         </Button>
         <Button variant="contained" onClick={handleSave} disabled={saving}>
           Отправить
@@ -618,6 +626,24 @@ export default function DashboardPage() {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (loading || reviewBooking || !user?.id) return;
+
+    const nowTime = Date.now();
+    const pendingReview = bookings.find((booking) => {
+      const storageKey = `soundbox-review-prompted:${user.id}:${booking.id}`;
+      return booking.status === 'active'
+        && !booking.review_rating
+        && new Date(booking.end_time).getTime() <= nowTime
+        && !localStorage.getItem(storageKey);
+    });
+
+    if (pendingReview) {
+      localStorage.setItem(`soundbox-review-prompted:${user.id}:${pendingReview.id}`, '1');
+      setReviewBooking({ ...pendingReview, autoPrompt: true });
+    }
+  }, [bookings, loading, reviewBooking, user?.id]);
 
   const now = new Date();
   const rawActive = bookings.filter((b) => b.status === 'active' && new Date(b.end_time) > now);

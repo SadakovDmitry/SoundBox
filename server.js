@@ -91,12 +91,30 @@ db.exec(`
     FOREIGN KEY (booking_id) REFERENCES bookings(id),
     FOREIGN KEY (cabin_id) REFERENCES cabins(id)
   );
+
+  CREATE TABLE IF NOT EXISTS partners (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    city TEXT,
+    contact_name TEXT,
+    email TEXT,
+    phone TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS cabin_partners (
+    cabin_id INTEGER PRIMARY KEY,
+    partner_id INTEGER NOT NULL,
+    FOREIGN KEY (cabin_id) REFERENCES cabins(id),
+    FOREIGN KEY (partner_id) REFERENCES partners(id)
+  );
 `);
 
 // Add profile columns if missing
 try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch { /* column may already exist */ }
 try { db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT'); } catch { /* column may already exist */ }
 try { db.exec('ALTER TABLE users ADD COLUMN balance INTEGER DEFAULT 0'); } catch { /* column may already exist */ }
+try { db.exec('ALTER TABLE users ADD COLUMN partner_id INTEGER'); } catch { /* column may already exist */ }
 try { db.exec('ALTER TABLE bookings ADD COLUMN total_price INTEGER DEFAULT 0'); } catch { /* column may already exist */ }
 try { db.exec('ALTER TABLE franchise_leads ADD COLUMN status TEXT DEFAULT "Новая"'); } catch { /* column may already exist */ }
 try { db.exec('ALTER TABLE franchise_leads ADD COLUMN manager_note TEXT'); } catch { /* column may already exist */ }
@@ -132,6 +150,27 @@ if (cabinCount === 0) {
   console.log('✅ Seeded 10 cabins in Moscow');
 }
 
+// ─── Seed Partners ───────────────────────────────────────────
+const partnerCount = db.prepare('SELECT COUNT(*) as count FROM partners').get().count;
+if (partnerCount === 0) {
+  const insertPartner = db.prepare(`
+    INSERT INTO partners (name, city, contact_name, email, phone)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  insertPartner.run('SoundBox Центр', 'Москва', 'Анна Смирнова', 'center@soundbox.test', '+7 900 100-10-10');
+  insertPartner.run('SoundBox Campus', 'Москва', 'Илья Орлов', 'campus@soundbox.test', '+7 900 200-20-20');
+  insertPartner.run('SoundBox Transit', 'Москва', 'Мария Волкова', 'transit@soundbox.test', '+7 900 300-30-30');
+}
+
+const cabinPartnerCount = db.prepare('SELECT COUNT(*) as count FROM cabin_partners').get().count;
+if (cabinPartnerCount === 0) {
+  const assign = db.prepare('INSERT OR REPLACE INTO cabin_partners (cabin_id, partner_id) VALUES (?, ?)');
+  for (let cabinId = 1; cabinId <= 10; cabinId++) {
+    const partnerId = cabinId <= 4 ? 1 : cabinId <= 7 ? 2 : 3;
+    assign.run(cabinId, partnerId);
+  }
+}
+
 // ─── Auth Middleware ─────────────────────────────────────────
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
@@ -148,16 +187,184 @@ function authMiddleware(req, res, next) {
 
 function getPublicUser(userId) {
   return db.prepare(`
-    SELECT id, name, email, phone, avatar_url, balance, created_at
+    SELECT id, name, email, phone, avatar_url, balance, partner_id, created_at
     FROM users
     WHERE id = ?
   `).get(userId);
+}
+
+function getUserPartnerId(userId) {
+  const user = db.prepare('SELECT partner_id FROM users WHERE id = ?').get(userId);
+  if (user?.partner_id) return user.partner_id;
+  return db.prepare('SELECT id FROM partners ORDER BY id LIMIT 1').get()?.id || null;
+}
+
+function getPartner(partnerId) {
+  return db.prepare('SELECT * FROM partners WHERE id = ?').get(partnerId);
+}
+
+function getCabinsForPartner(partnerId) {
+  return db.prepare(`
+    SELECT c.*, p.id as partner_id, p.name as partner_name,
+           COALESCE(bs.booking_count, 0) as booking_count,
+           COALESCE(bs.revenue, 0) as revenue,
+           COALESCE(bs.hours, 0) as hours,
+           COALESCE(rs.review_count, 0) as review_count
+    FROM cabins c
+    JOIN cabin_partners cp ON cp.cabin_id = c.id
+    JOIN partners p ON p.id = cp.partner_id
+    LEFT JOIN (
+      SELECT cabin_id,
+             COUNT(*) as booking_count,
+             COALESCE(SUM(CASE WHEN status = 'active' THEN total_price ELSE 0 END), 0) as revenue,
+             COALESCE(SUM(CASE WHEN status = 'active' THEN (julianday(end_time) - julianday(start_time)) * 24 ELSE 0 END), 0) as hours
+      FROM bookings
+      GROUP BY cabin_id
+    ) bs ON bs.cabin_id = c.id
+    LEFT JOIN (
+      SELECT cabin_id, COUNT(*) as review_count
+      FROM reviews
+      GROUP BY cabin_id
+    ) rs ON rs.cabin_id = c.id
+    WHERE cp.partner_id = ?
+    ORDER BY revenue DESC, c.id ASC
+  `).all(partnerId).map((cabin) => ({ ...cabin, ...getCabinStatus(cabin.id) }));
+}
+
+function getAllCabinsWithPartners() {
+  return db.prepare(`
+    SELECT c.*, p.id as partner_id, p.name as partner_name,
+           COALESCE(bs.booking_count, 0) as booking_count,
+           COALESCE(bs.revenue, 0) as revenue,
+           COALESCE(bs.hours, 0) as hours
+    FROM cabins c
+    LEFT JOIN cabin_partners cp ON cp.cabin_id = c.id
+    LEFT JOIN partners p ON p.id = cp.partner_id
+    LEFT JOIN (
+      SELECT cabin_id,
+             COUNT(*) as booking_count,
+             COALESCE(SUM(CASE WHEN status = 'active' THEN total_price ELSE 0 END), 0) as revenue,
+             COALESCE(SUM(CASE WHEN status = 'active' THEN (julianday(end_time) - julianday(start_time)) * 24 ELSE 0 END), 0) as hours
+      FROM bookings
+      GROUP BY cabin_id
+    ) bs ON bs.cabin_id = c.id
+    ORDER BY c.id ASC
+  `).all().map((cabin) => ({ ...cabin, ...getCabinStatus(cabin.id) }));
 }
 
 function toLocalDateTime(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
   const pad = (number) => String(number).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function toDateKey(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  const pad = (number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function getPeriod(scale = 'month', cursor = new Date()) {
+  const base = cursor ? new Date(cursor) : new Date();
+  if (Number.isNaN(base.getTime())) return getPeriod(scale, new Date());
+  const start = new Date(base);
+  const end = new Date(base);
+  const buckets = [];
+  const pad = (number) => String(number).padStart(2, '0');
+
+  if (scale === 'year') {
+    start.setMonth(0, 1);
+    start.setHours(0, 0, 0, 0);
+    end.setFullYear(start.getFullYear() + 1, 0, 1);
+    end.setHours(0, 0, 0, 0);
+    for (let month = 0; month < 12; month++) {
+      const key = `${start.getFullYear()}-${pad(month + 1)}`;
+      buckets.push({ key, label: new Date(start.getFullYear(), month, 1).toLocaleDateString('ru-RU', { month: 'short' }) });
+    }
+    return { scale, start, end, buckets, label: String(start.getFullYear()) };
+  }
+
+  if (scale === 'day') {
+    start.setHours(0, 0, 0, 0);
+    end.setTime(start.getTime());
+    end.setDate(start.getDate() + 1);
+    const dayKey = toDateKey(start);
+    for (let hour = 0; hour < 24; hour++) {
+      buckets.push({ key: `${dayKey}T${pad(hour)}`, label: `${pad(hour)}:00` });
+    }
+    return { scale, start, end, buckets, label: start.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) };
+  }
+
+  start.setDate(1);
+  start.setHours(0, 0, 0, 0);
+  end.setTime(start.getTime());
+  end.setMonth(start.getMonth() + 1);
+  const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+  for (let day = 1; day <= daysInMonth; day++) {
+    const key = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(day)}`;
+    buckets.push({ key, label: String(day) });
+  }
+  return { scale: 'month', start, end, buckets, label: start.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) };
+}
+
+function getAnalytics({ scale = 'month', cursor, partnerId, cabinId } = {}) {
+  const period = getPeriod(scale, cursor || new Date());
+  const bucketExpr = period.scale === 'year'
+    ? "substr(b.start_time, 1, 7)"
+    : period.scale === 'day'
+      ? "substr(b.start_time, 1, 13)"
+      : "substr(b.start_time, 1, 10)";
+  const filters = ["b.status = 'active'", 'b.start_time >= ?', 'b.start_time < ?'];
+  const params = [toLocalDateTime(period.start), toLocalDateTime(period.end)];
+
+  if (partnerId) {
+    filters.push('cp.partner_id = ?');
+    params.push(partnerId);
+  }
+  if (cabinId) {
+    filters.push('b.cabin_id = ?');
+    params.push(cabinId);
+  }
+
+  const rows = db.prepare(`
+    SELECT ${bucketExpr} as bucket,
+           COUNT(b.id) as bookings,
+           COALESCE(SUM(b.total_price), 0) as revenue,
+           COALESCE(SUM((julianday(b.end_time) - julianday(b.start_time)) * 24), 0) as hours
+    FROM bookings b
+    JOIN cabins c ON c.id = b.cabin_id
+    LEFT JOIN cabin_partners cp ON cp.cabin_id = c.id
+    WHERE ${filters.join(' AND ')}
+    GROUP BY bucket
+    ORDER BY bucket ASC
+  `).all(...params);
+
+  const byBucket = new Map(rows.map((row) => [row.bucket, row]));
+  const series = period.buckets.map((bucket) => {
+    const row = byBucket.get(bucket.key);
+    return {
+      key: bucket.key,
+      label: bucket.label,
+      bookings: Number(row?.bookings || 0),
+      revenue: Number(row?.revenue || 0),
+      hours: Number(row?.hours || 0),
+    };
+  });
+
+  const totals = series.reduce((acc, item) => ({
+    bookings: acc.bookings + item.bookings,
+    revenue: acc.revenue + item.revenue,
+    hours: acc.hours + item.hours,
+  }), { bookings: 0, revenue: 0, hours: 0 });
+
+  return {
+    scale: period.scale,
+    period_label: period.label,
+    start: toLocalDateTime(period.start),
+    end: toLocalDateTime(period.end),
+    totals,
+    series,
+  };
 }
 
 function getCabinStatus(cabinId) {
@@ -638,16 +845,10 @@ app.get('/api/notifications', authMiddleware, (req, res) => {
 });
 
 app.get('/api/partner/summary', authMiddleware, (req, res) => {
-  const cabins = db.prepare(`
-    SELECT c.id, c.name, c.address, c.rating, c.price_per_hour,
-           COUNT(b.id) as booking_count,
-           COALESCE(SUM(CASE WHEN b.status = 'active' THEN b.total_price ELSE 0 END), 0) as revenue,
-           COALESCE(SUM(CASE WHEN b.status = 'active' THEN (julianday(b.end_time) - julianday(b.start_time)) * 24 ELSE 0 END), 0) as hours
-    FROM cabins c
-    LEFT JOIN bookings b ON b.cabin_id = c.id
-    GROUP BY c.id
-    ORDER BY revenue DESC
-  `).all();
+  const partnerId = Number(req.query.partner_id) || getUserPartnerId(req.userId);
+  const partner = getPartner(partnerId);
+  if (!partner) return res.status(404).json({ error: 'Партнёр не найден' });
+  const cabins = getCabinsForPartner(partnerId);
 
   const totals = cabins.reduce((acc, cabin) => ({
     revenue: acc.revenue + Number(cabin.revenue || 0),
@@ -655,7 +856,34 @@ app.get('/api/partner/summary', authMiddleware, (req, res) => {
     hours: acc.hours + Number(cabin.hours || 0),
   }), { revenue: 0, bookings: 0, hours: 0 });
 
-  res.json({ totals, cabins: cabins.map((cabin) => ({ ...cabin, ...getCabinStatus(cabin.id) })) });
+  res.json({ partner, totals, cabins });
+});
+
+app.get('/api/partner/analytics', authMiddleware, (req, res) => {
+  const partnerId = Number(req.query.partner_id) || getUserPartnerId(req.userId);
+  if (!getPartner(partnerId)) return res.status(404).json({ error: 'Партнёр не найден' });
+  const cabinId = req.query.cabin_id ? Number(req.query.cabin_id) : null;
+  if (cabinId) {
+    const belongs = db.prepare('SELECT cabin_id FROM cabin_partners WHERE cabin_id = ? AND partner_id = ?').get(cabinId, partnerId);
+    if (!belongs) return res.status(403).json({ error: 'Кабинка не принадлежит партнёру' });
+  }
+  res.json(getAnalytics({ scale: req.query.scale, cursor: req.query.cursor, partnerId, cabinId }));
+});
+
+app.get('/api/partner/cabins/:id/reviews', authMiddleware, (req, res) => {
+  const partnerId = Number(req.query.partner_id) || getUserPartnerId(req.userId);
+  const cabinId = Number(req.params.id);
+  const belongs = db.prepare('SELECT cabin_id FROM cabin_partners WHERE cabin_id = ? AND partner_id = ?').get(cabinId, partnerId);
+  if (!belongs) return res.status(403).json({ error: 'Кабинка не принадлежит партнёру' });
+  const reviews = db.prepare(`
+    SELECT r.*, u.name as user_name, c.name as cabin_name
+    FROM reviews r
+    JOIN users u ON u.id = r.user_id
+    JOIN cabins c ON c.id = r.cabin_id
+    WHERE r.cabin_id = ?
+    ORDER BY r.created_at DESC
+  `).all(cabinId);
+  res.json(reviews);
 });
 
 app.get('/api/admin/summary', authMiddleware, (req, res) => {
@@ -663,7 +891,17 @@ app.get('/api/admin/summary', authMiddleware, (req, res) => {
   const bookings = db.prepare("SELECT COUNT(*) as count FROM bookings WHERE status = 'active'").get().count;
   const revenue = db.prepare("SELECT COALESCE(SUM(total_price), 0) as total FROM bookings WHERE status = 'active'").get().total;
   const leads = db.prepare('SELECT COUNT(*) as count FROM franchise_leads').get().count;
-  res.json({ users, bookings, revenue, leads });
+  const partners = db.prepare('SELECT COUNT(*) as count FROM partners').get().count;
+  res.json({ users, bookings, revenue, leads, partners });
+});
+
+app.get('/api/admin/analytics', authMiddleware, (req, res) => {
+  res.json(getAnalytics({
+    scale: req.query.scale,
+    cursor: req.query.cursor,
+    partnerId: req.query.partner_id ? Number(req.query.partner_id) : null,
+    cabinId: req.query.cabin_id ? Number(req.query.cabin_id) : null,
+  }));
 });
 
 app.get('/api/admin/franchise-leads', authMiddleware, (req, res) => {
@@ -699,6 +937,69 @@ app.get('/api/admin/users', authMiddleware, (req, res) => {
     LIMIT 80
   `).all();
   res.json(users);
+});
+
+app.get('/api/admin/cabins', authMiddleware, (req, res) => {
+  res.json(getAllCabinsWithPartners());
+});
+
+app.get('/api/admin/partners', authMiddleware, (req, res) => {
+  const partners = db.prepare(`
+    SELECT p.*,
+           COUNT(DISTINCT cp.cabin_id) as cabin_count,
+           COALESCE(SUM(bs.booking_count), 0) as booking_count,
+           COALESCE(SUM(bs.revenue), 0) as revenue,
+           COALESCE(SUM(bs.hours), 0) as hours
+    FROM partners p
+    LEFT JOIN cabin_partners cp ON cp.partner_id = p.id
+    LEFT JOIN (
+      SELECT cabin_id,
+             COUNT(*) as booking_count,
+             COALESCE(SUM(CASE WHEN status = 'active' THEN total_price ELSE 0 END), 0) as revenue,
+             COALESCE(SUM(CASE WHEN status = 'active' THEN (julianday(end_time) - julianday(start_time)) * 24 ELSE 0 END), 0) as hours
+      FROM bookings
+      GROUP BY cabin_id
+    ) bs ON bs.cabin_id = cp.cabin_id
+    GROUP BY p.id
+    ORDER BY revenue DESC, p.id ASC
+  `).all();
+  res.json(partners);
+});
+
+app.get('/api/admin/partners/:id/summary', authMiddleware, (req, res) => {
+  const partnerId = Number(req.params.id);
+  const partner = getPartner(partnerId);
+  if (!partner) return res.status(404).json({ error: 'Партнёр не найден' });
+  const cabins = getCabinsForPartner(partnerId);
+  const totals = cabins.reduce((acc, cabin) => ({
+    revenue: acc.revenue + Number(cabin.revenue || 0),
+    bookings: acc.bookings + Number(cabin.booking_count || 0),
+    hours: acc.hours + Number(cabin.hours || 0),
+  }), { revenue: 0, bookings: 0, hours: 0 });
+  res.json({ partner, totals, cabins });
+});
+
+app.get('/api/admin/partners/:id/analytics', authMiddleware, (req, res) => {
+  const partnerId = Number(req.params.id);
+  if (!getPartner(partnerId)) return res.status(404).json({ error: 'Партнёр не найден' });
+  res.json(getAnalytics({
+    scale: req.query.scale,
+    cursor: req.query.cursor,
+    partnerId,
+    cabinId: req.query.cabin_id ? Number(req.query.cabin_id) : null,
+  }));
+});
+
+app.get('/api/admin/cabins/:id/reviews', authMiddleware, (req, res) => {
+  const reviews = db.prepare(`
+    SELECT r.*, u.name as user_name, c.name as cabin_name
+    FROM reviews r
+    JOIN users u ON u.id = r.user_id
+    JOIN cabins c ON c.id = r.cabin_id
+    WHERE r.cabin_id = ?
+    ORDER BY r.created_at DESC
+  `).all(req.params.id);
+  res.json(reviews);
 });
 
 // ─── Serve Frontend (Production) ─────────────────────────────

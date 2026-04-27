@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Card, CardContent, Chip, Divider, MenuItem, Skeleton,
+  Box, Button, Card, CardContent, Chip, Collapse, Divider, MenuItem, Skeleton,
   TextField, Typography,
 } from '@mui/material';
 import {
-  ArrowBack, Assignment, EventAvailable, Group, MonetizationOn,
-  Save,
+  ArrowBack, Assignment, BusinessCenter, EventAvailable, ExpandLess,
+  ExpandMore, Group, MeetingRoom, MonetizationOn, Save,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { api } from '../api';
+import AnalyticsPanel from '../components/AnalyticsPanel';
+import PartnerDashboardView from '../components/PartnerDashboardView';
 
 const leadStatuses = ['Новая', 'В работе', 'Созвон', 'Партнёр', 'Отказ'];
 
@@ -20,20 +22,30 @@ export default function AdminPage() {
   const [leads, setLeads] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [users, setUsers] = useState([]);
+  const [cabins, setCabins] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [selectedPartnerId, setSelectedPartnerId] = useState(null);
+  const [showUsers, setShowUsers] = useState(false);
+  const [showCabins, setShowCabins] = useState(false);
+  const [showBookings, setShowBookings] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     try {
-      const [summaryData, leadsData, bookingsData, usersData] = await Promise.all([
+      const [summaryData, leadsData, bookingsData, usersData, cabinsData, partnersData] = await Promise.all([
         api.getAdminSummary(),
         api.getAdminFranchiseLeads(),
         api.getAdminBookings(),
         api.getAdminUsers(),
+        api.getAdminCabins(),
+        api.getAdminPartners(),
       ]);
       setSummary(summaryData);
       setLeads(leadsData);
       setBookings(bookingsData);
       setUsers(usersData);
+      setCabins(cabinsData);
+      setPartners(partnersData);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -69,19 +81,20 @@ export default function AdminPage() {
       px: { xs: 1.5, sm: 2, md: 3 },
       py: { xs: 2, sm: 3 },
     }}>
-      <Box sx={{ maxWidth: 1040, mx: 'auto' }}>
+      <Box sx={{ maxWidth: 1180, mx: 'auto' }}>
         <Button startIcon={<ArrowBack />} onClick={() => navigate('/dashboard')} sx={{ mb: 2 }}>
           В кабинет
         </Button>
 
         <Typography variant="h4" fontWeight={800} sx={{ mb: 1 }}>Панель управления</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Заявки на франшизу, пользователи и бронирования в одном месте.
+          Общая аналитика, партнёры, заявки, пользователи и кабинки.
         </Typography>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 1.5, mb: 3 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' }, gap: 1.5, mb: 3 }}>
           {[
             { label: 'Пользователи', value: summary?.users, icon: <Group /> },
+            { label: 'Партнёры', value: summary?.partners, icon: <BusinessCenter /> },
             { label: 'Брони', value: summary?.bookings, icon: <EventAvailable /> },
             { label: 'Выручка', value: `${summary?.revenue || 0} ₽`, icon: <MonetizationOn /> },
             { label: 'Заявки', value: summary?.leads, icon: <Assignment /> },
@@ -95,6 +108,55 @@ export default function AdminPage() {
             </Card>
           ))}
         </Box>
+
+        <AnalyticsPanel title="Общая статистика по всем кабинкам" mode="admin" />
+
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" fontWeight={800} sx={{ mb: 2 }}>Партнёры</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
+              {partners.map((partner) => {
+                const selected = selectedPartnerId === partner.id;
+                return (
+                  <Box
+                    key={partner.id}
+                    onClick={() => setSelectedPartnerId(partner.id)}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      border: selected ? '1px solid rgba(124,77,255,0.8)' : '1px solid rgba(255,255,255,0.08)',
+                      background: selected ? 'rgba(124,77,255,0.16)' : 'rgba(255,255,255,0.03)',
+                    }}
+                  >
+                    <Typography fontWeight={800}>{partner.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{partner.city} · {partner.contact_name}</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                      <Chip size="small" label={`${partner.cabin_count} кабинок`} />
+                      <Chip size="small" label={`${Math.round(partner.revenue || 0)} ₽`} variant="outlined" />
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          </CardContent>
+        </Card>
+
+        {selectedPartnerId && (
+          <Card sx={{ mb: 3, background: 'rgba(255,255,255,0.025)' }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" fontWeight={800}>
+                  Кабинет выбранного партнёра
+                </Typography>
+                <Button size="small" variant="outlined" onClick={() => setSelectedPartnerId(null)}>
+                  Закрыть
+                </Button>
+              </Box>
+              <PartnerDashboardView partnerId={selectedPartnerId} adminMode />
+            </CardContent>
+          </Card>
+        )}
 
         <Card sx={{ mb: 3 }}>
           <CardContent>
@@ -129,8 +191,54 @@ export default function AdminPage() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
           <Card>
             <CardContent>
-              <Typography variant="h6" fontWeight={800} sx={{ mb: 2 }}>Последние бронирования</Typography>
-              {bookings.slice(0, 10).map((booking) => (
+              <Button fullWidth endIcon={showCabins ? <ExpandLess /> : <ExpandMore />} onClick={() => setShowCabins(!showCabins)} sx={{ justifyContent: 'space-between', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <MeetingRoom /> Все кабинки
+                </Box>
+              </Button>
+              <Collapse in={showCabins}>
+                {cabins.map((cabin) => (
+                  <Box key={cabin.id} sx={{ py: 1 }}>
+                    <Typography variant="body2" fontWeight={700}>{cabin.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {cabin.partner_name || 'Без партнёра'} · {Math.round(cabin.revenue || 0)} ₽ · рейтинг {Number(cabin.rating || 0).toFixed(1)}
+                    </Typography>
+                    <Divider sx={{ mt: 1, borderColor: 'rgba(255,255,255,0.06)' }} />
+                  </Box>
+                ))}
+              </Collapse>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <Button fullWidth endIcon={showUsers ? <ExpandLess /> : <ExpandMore />} onClick={() => setShowUsers(!showUsers)} sx={{ justifyContent: 'space-between', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Group /> Пользователи
+                </Box>
+              </Button>
+              <Collapse in={showUsers}>
+                {users.map((user) => (
+                  <Box key={user.id} sx={{ py: 1 }}>
+                    <Typography variant="body2" fontWeight={700}>{user.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{user.email} · баланс {user.balance || 0} ₽</Typography>
+                    <Divider sx={{ mt: 1, borderColor: 'rgba(255,255,255,0.06)' }} />
+                  </Box>
+                ))}
+              </Collapse>
+            </CardContent>
+          </Card>
+        </Box>
+
+        <Card sx={{ mt: 2 }}>
+          <CardContent>
+            <Button fullWidth endIcon={showBookings ? <ExpandLess /> : <ExpandMore />} onClick={() => setShowBookings(!showBookings)} sx={{ justifyContent: 'space-between', mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <EventAvailable /> Последние бронирования
+              </Box>
+            </Button>
+            <Collapse in={showBookings}>
+              {bookings.slice(0, 12).map((booking) => (
                 <Box key={booking.id} sx={{ py: 1 }}>
                   <Typography variant="body2" fontWeight={700}>{booking.cabin_name}</Typography>
                   <Typography variant="caption" color="text.secondary">
@@ -139,22 +247,9 @@ export default function AdminPage() {
                   <Divider sx={{ mt: 1, borderColor: 'rgba(255,255,255,0.06)' }} />
                 </Box>
               ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent>
-              <Typography variant="h6" fontWeight={800} sx={{ mb: 2 }}>Пользователи</Typography>
-              {users.slice(0, 10).map((user) => (
-                <Box key={user.id} sx={{ py: 1 }}>
-                  <Typography variant="body2" fontWeight={700}>{user.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">{user.email} · баланс {user.balance || 0} ₽</Typography>
-                  <Divider sx={{ mt: 1, borderColor: 'rgba(255,255,255,0.06)' }} />
-                </Box>
-              ))}
-            </CardContent>
-          </Card>
-        </Box>
+            </Collapse>
+          </CardContent>
+        </Card>
       </Box>
     </Box>
   );

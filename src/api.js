@@ -1,5 +1,14 @@
 const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
 
+function toQuery(params = {}) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, value);
+  }
+  const query = search.toString();
+  return query ? `?${query}` : '';
+}
+
 function getHeaders() {
   const token = localStorage.getItem('token');
   return {
@@ -96,11 +105,20 @@ export const api = {
   getNotifications: () =>
     fetch(`${API_URL}/notifications`, { headers: getHeaders() }).then(handleResponse),
 
-  getPartnerSummary: () =>
-    fetch(`${API_URL}/partner/summary`, { headers: getHeaders() }).then(handleResponse),
+  getPartnerSummary: (partnerId) =>
+    fetch(`${API_URL}/partner/summary${toQuery({ partner_id: partnerId })}`, { headers: getHeaders() }).then(handleResponse),
+
+  getPartnerAnalytics: (params) =>
+    fetch(`${API_URL}/partner/analytics${toQuery(params)}`, { headers: getHeaders() }).then(handleResponse),
+
+  getPartnerCabinReviews: (cabinId, partnerId) =>
+    fetch(`${API_URL}/partner/cabins/${cabinId}/reviews${toQuery({ partner_id: partnerId })}`, { headers: getHeaders() }).then(handleResponse),
 
   getAdminSummary: () =>
     fetch(`${API_URL}/admin/summary`, { headers: getHeaders() }).then(handleResponse),
+
+  getAdminAnalytics: (params) =>
+    fetch(`${API_URL}/admin/analytics${toQuery(params)}`, { headers: getHeaders() }).then(handleResponse),
 
   getAdminFranchiseLeads: () =>
     fetch(`${API_URL}/admin/franchise-leads`, { headers: getHeaders() }).then(handleResponse),
@@ -117,6 +135,21 @@ export const api = {
 
   getAdminUsers: () =>
     fetch(`${API_URL}/admin/users`, { headers: getHeaders() }).then(handleResponse),
+
+  getAdminCabins: () =>
+    fetch(`${API_URL}/admin/cabins`, { headers: getHeaders() }).then(handleResponse),
+
+  getAdminPartners: () =>
+    fetch(`${API_URL}/admin/partners`, { headers: getHeaders() }).then(handleResponse),
+
+  getAdminPartnerSummary: (partnerId) =>
+    fetch(`${API_URL}/admin/partners/${partnerId}/summary`, { headers: getHeaders() }).then(handleResponse),
+
+  getAdminPartnerAnalytics: (partnerId, params) =>
+    fetch(`${API_URL}/admin/partners/${partnerId}/analytics${toQuery(params)}`, { headers: getHeaders() }).then(handleResponse),
+
+  getAdminCabinReviews: (cabinId) =>
+    fetch(`${API_URL}/admin/cabins/${cabinId}/reviews`, { headers: getHeaders() }).then(handleResponse),
 
   updateProfile: (data) =>
     fetch(`${API_URL}/profile`, {

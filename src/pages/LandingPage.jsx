@@ -159,9 +159,9 @@ export default function LandingPage() {
         background: '#0A0E1A',
         color: '#fff',
         overflow: 'hidden',
-        fontFamily: '"BiautifullText", Inter, sans-serif',
+        fontFamily: '"Manrope", Inter, sans-serif',
         '& *': {
-          fontFamily: '"BiautifullText", Inter, sans-serif !important',
+          fontFamily: '"Manrope", Inter, sans-serif !important',
         },
       }}
     >

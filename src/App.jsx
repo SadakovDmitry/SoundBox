@@ -10,6 +10,7 @@ import LandingPage from './pages/LandingPage';
 import FranchisePage from './pages/FranchisePage';
 import AdminPage from './pages/AdminPage';
 import PartnerPage from './pages/PartnerPage';
+import CursorComet from './components/CursorComet';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -46,6 +47,7 @@ export default function App() {
       <CssBaseline />
       <BrowserRouter>
         <AuthProvider>
+          <CursorComet />
           <AppRoutes />
           <Toaster
             position="top-center"
