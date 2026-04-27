@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Card, CardContent, Chip, Collapse, Divider, MenuItem, Skeleton,
-  TextField, Typography,
+  Box, Button, Card, CardContent, Chip, Collapse, Divider, InputAdornment,
+  MenuItem, Skeleton, Tab, Tabs, TextField, Typography,
 } from '@mui/material';
 import {
   ArrowBack, Assignment, BusinessCenter, EventAvailable, ExpandLess,
-  ExpandMore, Group, MeetingRoom, MonetizationOn, Save,
+  ExpandMore, Group, MeetingRoom, MonetizationOn, Save, Search,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -28,6 +28,8 @@ export default function AdminPage() {
   const [showUsers, setShowUsers] = useState(false);
   const [showCabins, setShowCabins] = useState(false);
   const [showBookings, setShowBookings] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [partnerSearch, setPartnerSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
@@ -74,6 +76,16 @@ export default function AdminPage() {
     setLeads((prev) => prev.map((lead) => (lead.id === id ? { ...lead, ...patch } : lead)));
   };
 
+  const filteredPartners = useMemo(() => {
+    const query = partnerSearch.trim().toLowerCase();
+    if (!query) return partners;
+    return partners.filter((partner) => (
+      partner.name.toLowerCase().includes(query)
+      || partner.city?.toLowerCase().includes(query)
+      || partner.contact_name?.toLowerCase().includes(query)
+    ));
+  }, [partnerSearch, partners]);
+
   return (
     <Box sx={{
       minHeight: '100dvh',
@@ -109,13 +121,48 @@ export default function AdminPage() {
           ))}
         </Box>
 
-        <AnalyticsPanel title="Общая статистика по всем кабинкам" mode="admin" />
+        <Card sx={{ mb: 3 }}>
+          <CardContent sx={{ py: 1.5 }}>
+            <Tabs
+              value={activeTab}
+              onChange={(_, value) => setActiveTab(value)}
+              variant="scrollable"
+              scrollButtons="auto"
+            >
+              <Tab value="overview" label="Обзор" />
+              <Tab value="partners" label="Партнёры" />
+              <Tab value="operations" label="Операции" />
+            </Tabs>
+          </CardContent>
+        </Card>
 
+        {activeTab === 'overview' && (
+          <AnalyticsPanel title="Общая статистика по всем кабинкам" mode="admin" />
+        )}
+
+        {activeTab === 'partners' && (
+        <>
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h6" fontWeight={800} sx={{ mb: 2 }}>Партнёры</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
+              <Typography variant="h6" fontWeight={800}>Партнёры</Typography>
+              <TextField
+                size="small"
+                placeholder="Поиск партнёра"
+                value={partnerSearch}
+                onChange={(event) => setPartnerSearch(event.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search sx={{ fontSize: 18, color: 'secondary.main' }} />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ width: { xs: '100%', sm: 320 } }}
+              />
+            </Box>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
-              {partners.map((partner) => {
+              {filteredPartners.map((partner) => {
                 const selected = selectedPartnerId === partner.id;
                 return (
                   <Box
@@ -139,6 +186,11 @@ export default function AdminPage() {
                 );
               })}
             </Box>
+            {!filteredPartners.length && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                Партнёры не найдены.
+              </Typography>
+            )}
           </CardContent>
         </Card>
 
@@ -157,7 +209,11 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         )}
+        </>
+        )}
 
+        {activeTab === 'operations' && (
+        <>
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" fontWeight={800} sx={{ mb: 2 }}>Заявки на франшизу</Typography>
@@ -250,6 +306,8 @@ export default function AdminPage() {
             </Collapse>
           </CardContent>
         </Card>
+        </>
+        )}
       </Box>
     </Box>
   );

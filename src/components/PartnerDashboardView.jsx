@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box, Button, Card, CardContent, Chip, Collapse, Dialog, DialogContent,
-  DialogTitle, LinearProgress, Rating, Skeleton, Typography,
+  DialogTitle, InputAdornment, LinearProgress, Rating, Skeleton, TextField, Typography,
 } from '@mui/material';
 import {
   BusinessCenter, EventAvailable, MonetizationOn, Reviews, Star, Timelapse,
+  Search, TrendingUp, WarningAmber,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -30,6 +31,7 @@ export default function PartnerDashboardView({ partnerId, adminMode = false }) {
   const [reviewsCabin, setReviewsCabin] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [cabinSearch, setCabinSearch] = useState('');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -62,7 +64,20 @@ export default function PartnerDashboardView({ partnerId, adminMode = false }) {
   };
 
   const totals = data?.totals || { revenue: 0, bookings: 0, hours: 0 };
-  const maxHours = Math.max(...(data?.cabins || []).map((cabin) => Number(cabin.hours || 0)), 1);
+  const cabins = useMemo(() => data?.cabins || [], [data]);
+  const maxHours = Math.max(...cabins.map((cabin) => Number(cabin.hours || 0)), 1);
+  const filteredCabins = useMemo(() => {
+    const query = cabinSearch.trim().toLowerCase();
+    if (!query) return cabins;
+    return cabins.filter((cabin) => (
+      cabin.name.toLowerCase().includes(query)
+      || cabin.address.toLowerCase().includes(query)
+      || cabin.status.toLowerCase().includes(query)
+    ));
+  }, [cabinSearch, cabins]);
+  const bestCabin = useMemo(() => [...cabins].sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0))[0], [cabins]);
+  const lowRatingCabin = useMemo(() => [...cabins].sort((a, b) => Number(a.rating || 0) - Number(b.rating || 0))[0], [cabins]);
+  const idleCabin = useMemo(() => [...cabins].sort((a, b) => Number(a.booking_count || 0) - Number(b.booking_count || 0))[0], [cabins]);
 
   return (
     <Box>
@@ -97,13 +112,46 @@ export default function PartnerDashboardView({ partnerId, adminMode = false }) {
         partnerId={partnerId}
       />
 
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5, mb: 2 }}>
+        {[
+          { label: 'Лидер по выручке', value: bestCabin?.name || 'Нет данных', helper: `${Math.round(bestCabin?.revenue || 0)} ₽`, icon: <TrendingUp /> },
+          { label: 'Проверить рейтинг', value: lowRatingCabin?.name || 'Нет данных', helper: `${Number(lowRatingCabin?.rating || 0).toFixed(1)} из 5`, icon: <WarningAmber /> },
+          { label: 'Мало броней', value: idleCabin?.name || 'Нет данных', helper: `${idleCabin?.booking_count || 0} броней`, icon: <EventAvailable /> },
+        ].map((item) => (
+          <Card key={item.label} sx={{ background: 'rgba(255,255,255,0.035)' }}>
+            <CardContent>
+              <Box sx={{ color: 'secondary.main', mb: 1 }}>{item.icon}</Box>
+              <Typography variant="caption" color="text.secondary">{item.label}</Typography>
+              <Typography fontWeight={800} sx={{ mt: 0.5 }}>{item.value}</Typography>
+              <Typography variant="caption" color="text.secondary">{item.helper}</Typography>
+            </CardContent>
+          </Card>
+        ))}
+      </Box>
+
       <Card>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <Typography variant="h6" fontWeight={800} sx={{ mb: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
-            <BusinessCenter sx={{ color: 'secondary.main' }} />
-            Кабинки
-          </Typography>
-          {(data?.cabins || []).map((cabin) => {
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
+            <Typography variant="h6" fontWeight={800} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <BusinessCenter sx={{ color: 'secondary.main' }} />
+              Кабинки
+            </Typography>
+            <TextField
+              size="small"
+              placeholder="Поиск кабинки"
+              value={cabinSearch}
+              onChange={(event) => setCabinSearch(event.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search sx={{ fontSize: 18, color: 'secondary.main' }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ width: { xs: '100%', sm: 320 } }}
+            />
+          </Box>
+          {filteredCabins.map((cabin) => {
             const hours = Number(cabin.hours || 0);
             const progress = Math.min(100, Math.round((hours / maxHours) * 100));
             const expanded = expandedCabinId === cabin.id;
@@ -149,11 +197,16 @@ export default function PartnerDashboardView({ partnerId, adminMode = false }) {
               </Box>
             );
           })}
+          {!filteredCabins.length && (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+              Кабинки не найдены.
+            </Typography>
+          )}
         </CardContent>
       </Card>
 
       <Dialog open={Boolean(reviewsCabin)} onClose={() => setReviewsCabin(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>
+        <DialogTitle component="div">
           <Typography variant="h6" fontWeight={800}>Отзывы: {reviewsCabin?.name}</Typography>
         </DialogTitle>
         <DialogContent>

@@ -115,6 +115,7 @@ try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch { /* column ma
 try { db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT'); } catch { /* column may already exist */ }
 try { db.exec('ALTER TABLE users ADD COLUMN balance INTEGER DEFAULT 0'); } catch { /* column may already exist */ }
 try { db.exec('ALTER TABLE users ADD COLUMN partner_id INTEGER'); } catch { /* column may already exist */ }
+try { db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'client'"); } catch { /* column may already exist */ }
 try { db.exec('ALTER TABLE bookings ADD COLUMN total_price INTEGER DEFAULT 0'); } catch { /* column may already exist */ }
 try { db.exec('ALTER TABLE franchise_leads ADD COLUMN status TEXT DEFAULT "Новая"'); } catch { /* column may already exist */ }
 try { db.exec('ALTER TABLE franchise_leads ADD COLUMN manager_note TEXT'); } catch { /* column may already exist */ }
@@ -187,7 +188,14 @@ function authMiddleware(req, res, next) {
 
 function getPublicUser(userId) {
   return db.prepare(`
-    SELECT id, name, email, phone, avatar_url, balance, partner_id, created_at
+    SELECT id, name, email, phone, avatar_url, balance, partner_id,
+           CASE
+             WHEN role IN ('admin', 'partner') THEN role
+             WHEN email LIKE '%admin%' THEN 'admin'
+             WHEN email LIKE '%partner%' THEN 'partner'
+             ELSE COALESCE(role, 'client')
+           END as role,
+           created_at
     FROM users
     WHERE id = ?
   `).get(userId);

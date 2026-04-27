@@ -20,6 +20,40 @@ const fadeUp = {
   show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] } },
 };
 
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08 } },
+};
+
+const cardReveal = {
+  hidden: { opacity: 0, y: 22, scale: 0.98 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } },
+};
+
+const hoverLift = {
+  y: -8,
+  scale: 1.015,
+  transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+};
+
+const viewport = { once: true, amount: 0.18 };
+
+function RevealBox({ children, sx, ...props }) {
+  return (
+    <Box
+      component={motion.section}
+      initial="hidden"
+      whileInView="show"
+      viewport={viewport}
+      variants={fadeUp}
+      sx={sx}
+      {...props}
+    >
+      {children}
+    </Box>
+  );
+}
+
 const valueCards = [
   {
     icon: <VolumeOff />,
@@ -170,20 +204,67 @@ export default function LandingPage() {
         sx={{
           position: 'sticky', top: 0, zIndex: 20,
           backdropFilter: 'blur(24px)',
-          background: 'rgba(10, 14, 26, 0.82)',
+          background: 'rgba(10, 14, 26, 0.9)',
           borderBottom: '1px solid rgba(255,255,255,0.08)',
+          isolation: 'isolate',
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 2,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(124,77,255,0.18) 12%, rgba(124,77,255,0.9) 32%, rgba(0,229,255,0.86) 50%, rgba(68,138,255,0.82) 68%, rgba(124,77,255,0.22) 88%, transparent 100%)',
+            backgroundSize: '320% 100%',
+            filter: 'blur(0.2px)',
+            opacity: 0.9,
+            animation: 'landing-header-flow 16s ease-in-out infinite',
+            zIndex: -1,
+          },
         }}
       >
-        <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+        <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, position: 'relative', zIndex: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-            <Box component="img" src="/favicon.svg" alt="" sx={{ width: 34, height: 34 }} />
+            <Box
+              component={motion.img}
+              src="/favicon.svg"
+              alt=""
+              animate={{ rotate: [0, -5, 4, 0], scale: [1, 1.08, 1] }}
+              transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+              sx={{ width: 34, height: 34, filter: 'drop-shadow(0 0 16px rgba(124,77,255,0.45))' }}
+            />
             <Typography variant="subtitle1" fontWeight={800}>SoundBox</Typography>
           </Box>
           <Stack direction="row" spacing={{ xs: 0.5, sm: 1 }} alignItems="center">
-            <Button component={RouterLink} to="/franchise" color="inherit" sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
+            <Button
+              component={RouterLink}
+              to="/franchise"
+              sx={{
+                display: { xs: 'none', sm: 'inline-flex' },
+                color: '#fff',
+                background: 'rgba(255,255,255,0.045)',
+                textShadow: '0 1px 14px rgba(0,0,0,0.55)',
+                '&:hover': { background: 'rgba(124,77,255,0.18)' },
+              }}
+            >
               Франшиза
             </Button>
-            <Button component={RouterLink} to="/login" variant="outlined" startIcon={<Login />} sx={{ borderColor: 'rgba(255,255,255,0.18)' }}>
+            <Button
+              component={RouterLink}
+              to="/login"
+              variant="outlined"
+              startIcon={<Login />}
+              sx={{
+                color: '#fff',
+                borderColor: 'rgba(255,255,255,0.32)',
+                background: 'rgba(10,14,26,0.52)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.22)',
+                '&:hover': {
+                  borderColor: 'rgba(0,229,255,0.72)',
+                  background: 'rgba(0,229,255,0.12)',
+                },
+              }}
+            >
               Приложение
             </Button>
           </Stack>
@@ -195,6 +276,8 @@ export default function LandingPage() {
         sx={{
           background:
             'radial-gradient(circle at 18% 14%, rgba(124,77,255,0.18), transparent 28%), radial-gradient(circle at 86% 8%, rgba(0,229,255,0.12), transparent 24%), linear-gradient(180deg, #0A0E1A 0%, #101426 45%, #0A0E1A 100%)',
+          backgroundSize: '140% 140%, 130% 130%, 100% 100%',
+          animation: 'landing-ambient 18s ease-in-out infinite alternate',
         }}
       >
         <Box
@@ -225,7 +308,17 @@ export default function LandingPage() {
               component="h1"
               variant="h2"
               fontWeight={900}
-              sx={{ fontSize: { xs: '2.45rem', sm: '3.35rem', md: '4.15rem' }, lineHeight: 0.98, letterSpacing: 0, maxWidth: 760 }}
+              sx={{
+                fontSize: { xs: '2.45rem', sm: '3.35rem', md: '4.15rem' },
+                lineHeight: 0.98,
+                letterSpacing: 0,
+                maxWidth: 760,
+                background: 'linear-gradient(90deg, #fff 0%, #D4FF68 38%, #00E5FF 62%, #fff 100%)',
+                backgroundSize: '220% 100%',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                animation: 'landing-shine 8s linear infinite',
+              }}
             >
               SoundBox
             </Typography>
@@ -243,11 +336,20 @@ export default function LandingPage() {
                 Открыть приложение
               </Button>
             </Stack>
-            <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
+            <Box component={motion.div} variants={stagger} sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
               {metrics.map((metric) => (
-                <Box key={metric.label} sx={{ p: 1.75, borderRadius: 2, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.035)' }}>
-                  <Typography variant="h5" fontWeight={900} sx={{ color: '#D4FF68' }}>{metric.value}</Typography>
-                  <Typography variant="caption" color="text.secondary">{metric.label}</Typography>
+                <Box
+                  key={metric.label}
+                  component={motion.div}
+                  variants={cardReveal}
+                  whileHover={hoverLift}
+                  sx={{ p: 1.75, borderRadius: 2, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.035)', position: 'relative', overflow: 'hidden' }}
+                >
+                  <Box sx={{ position: 'absolute', inset: 0, opacity: 0.2, background: 'linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.1) 45%, transparent 75%)', transform: 'translateX(-120%)', animation: 'landing-scan 6s ease-in-out infinite', pointerEvents: 'none', zIndex: 0 }} />
+                  <Box sx={{ position: 'relative', zIndex: 1 }}>
+                    <Typography variant="h5" fontWeight={900} sx={{ color: '#D4FF68', textShadow: '0 1px 16px rgba(0,0,0,0.45)' }}>{metric.value}</Typography>
+                    <Typography variant="caption" color="text.secondary">{metric.label}</Typography>
+                  </Box>
                 </Box>
               ))}
             </Box>
@@ -258,6 +360,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            whileHover={{ scale: 1.015 }}
             sx={{
               minHeight: { xs: 430, sm: 500 },
               position: 'relative',
@@ -266,6 +369,9 @@ export default function LandingPage() {
             }}
           >
             <Box
+              component={motion.div}
+              animate={{ y: [0, -10, 0] }}
+              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
               sx={{
                 width: '100%',
                 height: { xs: 430, sm: 520 },
@@ -275,7 +381,12 @@ export default function LandingPage() {
             >
               <SoundBoxModel />
             </Box>
-            <Box sx={{ position: 'absolute', zIndex: 4, bottom: { xs: 8, sm: 24 }, left: { xs: 4, sm: 18 }, right: { xs: 4, sm: 'auto' }, width: { xs: 'auto', sm: 300 }, p: 2, borderRadius: 3, background: 'rgba(15,20,38,0.88)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)' }}>
+            <Box
+              component={motion.div}
+              animate={{ y: [0, 8, 0] }}
+              transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+              sx={{ position: 'absolute', zIndex: 4, bottom: { xs: 8, sm: 24 }, left: { xs: 4, sm: 18 }, right: { xs: 4, sm: 'auto' }, width: { xs: 'auto', sm: 300 }, p: 2, borderRadius: 3, background: 'rgba(15,20,38,0.88)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', boxShadow: '0 18px 50px rgba(0,0,0,0.24)' }}
+            >
               <Typography variant="caption" color="text.secondary">Готовый формат</Typography>
               <Typography variant="h6" fontWeight={900}>Кабинка + бронирование + доступ</Typography>
               <Typography variant="body2" color="text.secondary">Пользователь выбирает время, бронирует кабинку и получает доступ без лишних действий.</Typography>
@@ -284,26 +395,33 @@ export default function LandingPage() {
         </Box>
 
         <Box sx={{ background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.025) 32%, rgba(255,255,255,0.025) 68%, transparent 100%)' }}>
-          <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 5, md: 6 } }}>
+          <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 5, md: 6 } }}>
             <Typography variant="h3" component="h2" fontWeight={900} sx={{ fontSize: { xs: '2rem', md: '2.7rem' }, letterSpacing: 0, mb: 1 }}>
               Почему SoundBox выбирают для современных пространств
             </Typography>
             <Typography color="text.secondary" sx={{ maxWidth: 760, lineHeight: 1.8, mb: 3 }}>
               SoundBox объединяет физический продукт, цифровой сервис и понятную модель запуска для мест с высоким потоком людей.
             </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+            <Box component={motion.div} variants={stagger} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
               {valueCards.map((item) => (
-                <Box key={item.title} sx={{ p: 2.5, borderRadius: 3, background: 'rgba(15,20,38,0.72)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                <Box
+                  key={item.title}
+                  component={motion.div}
+                  variants={cardReveal}
+                  whileHover={hoverLift}
+                  sx={{ p: 2.5, borderRadius: 3, background: 'rgba(15,20,38,0.72)', border: '1px solid rgba(255,255,255,0.09)', position: 'relative', overflow: 'hidden' }}
+                >
+                  <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: 'linear-gradient(180deg, #D4FF68, #00E5FF)', opacity: 0.8 }} />
                   <IconButton sx={{ mb: 1.5, color: '#00E5FF', background: 'rgba(0,229,255,0.08)' }}>{item.icon}</IconButton>
                   <Typography variant="h6" fontWeight={900}>{item.title}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1, lineHeight: 1.7 }}>{item.text}</Typography>
                 </Box>
               ))}
             </Box>
-          </Box>
+          </RevealBox>
         </Box>
 
-        <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 7, md: 9 } }}>
+        <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 7, md: 9 } }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.72fr 1.28fr' }, gap: { xs: 3, md: 5 }, alignItems: 'start' }}>
             <Box sx={{ position: { md: 'sticky' }, top: 96 }}>
               <Chip label="Для кого SoundBox" sx={{ mb: 2, color: '#D4FF68', background: 'rgba(212,255,104,0.08)' }} />
@@ -318,6 +436,12 @@ export default function LandingPage() {
               {audienceCards.map((item, index) => (
                 <Box
                   key={item.title}
+                  component={motion.div}
+                  initial={{ opacity: 0, x: index % 2 ? 28 : -28 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={viewport}
+                  transition={{ duration: 0.45, delay: index * 0.04, ease: [0.16, 1, 0.3, 1] }}
+                  whileHover={{ backgroundColor: 'rgba(255,255,255,0.045)' }}
                   sx={{
                     display: 'grid',
                     gridTemplateColumns: { xs: '1fr', sm: '210px 1fr' },
@@ -349,10 +473,10 @@ export default function LandingPage() {
               ))}
             </Box>
           </Box>
-        </Box>
+        </RevealBox>
 
         <Box sx={{ background: 'linear-gradient(180deg, transparent 0%, rgba(124,77,255,0.045) 38%, rgba(0,229,255,0.03) 70%, transparent 100%)' }}>
-          <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 6, md: 7 } }}>
+          <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 6, md: 7 } }}>
             <Box sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 5, background: 'linear-gradient(135deg, rgba(124,77,255,0.18), rgba(0,229,255,0.08))', border: '1px solid rgba(255,255,255,0.1)' }}>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.75fr 1.25fr' }, gap: { xs: 3, md: 5 }, alignItems: 'center' }}>
                 <Box>
@@ -365,9 +489,17 @@ export default function LandingPage() {
                   </Typography>
                 </Box>
                 <Box sx={{ position: 'relative', pl: { xs: 0, sm: 3 } }}>
-                  <Box sx={{ display: { xs: 'none', sm: 'block' }, position: 'absolute', left: 20, top: 18, bottom: 18, width: 2, background: 'linear-gradient(180deg, #D4FF68, #00E5FF)' }} />
+                  <Box sx={{ display: { xs: 'none', sm: 'block' }, position: 'absolute', left: 20, top: 18, bottom: 18, width: 2, background: 'linear-gradient(180deg, #D4FF68, #00E5FF)', transformOrigin: 'top', animation: 'landing-grow-line 1.3s ease-out both' }} />
                   {workSteps.map((step, index) => (
-                    <Box key={step} sx={{ display: 'grid', gridTemplateColumns: '44px 1fr', gap: 1.5, alignItems: 'center', mb: index === workSteps.length - 1 ? 0 : 2, position: 'relative' }}>
+                    <Box
+                      key={step}
+                      component={motion.div}
+                      initial={{ opacity: 0, x: 24 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={viewport}
+                      transition={{ duration: 0.42, delay: index * 0.08 }}
+                      sx={{ display: 'grid', gridTemplateColumns: '44px 1fr', gap: 1.5, alignItems: 'center', mb: index === workSteps.length - 1 ? 0 : 2, position: 'relative' }}
+                    >
                       <Box sx={{ width: 44, height: 44, borderRadius: '50%', display: 'grid', placeItems: 'center', fontWeight: 900, color: '#0A0E1A', background: index % 2 ? '#00E5FF' : '#D4FF68', border: '4px solid rgba(10,14,26,0.94)', zIndex: 1 }}>
                         {index + 1}
                       </Box>
@@ -379,10 +511,10 @@ export default function LandingPage() {
                 </Box>
               </Box>
             </Box>
-          </Box>
+          </RevealBox>
         </Box>
 
-        <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 7, md: 9 } }}>
+        <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 7, md: 9 } }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.84fr 1.16fr' }, gap: { xs: 4, md: 6 }, alignItems: 'start' }}>
             <Box>
             <Chip label="Плюсы для пользователей и владельцев локаций" sx={{ mb: 2, color: '#D4FF68', background: 'rgba(212,255,104,0.08)' }} />
@@ -393,9 +525,9 @@ export default function LandingPage() {
                 SoundBox закрывает повседневную потребность в приватном пространстве и одновременно дает владельцу локации новый сервис, который можно монетизировать без сложной операционной команды.
               </Typography>
             </Box>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
+            <Box component={motion.div} variants={stagger} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
               {strengths.map((item) => (
-                <Box key={item.label} sx={{ p: 2, borderRadius: 2, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <Box key={item.label} component={motion.div} variants={cardReveal} whileHover={hoverLift} sx={{ p: 2, borderRadius: 2, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <Stack direction="row" spacing={1.25} alignItems="center">
                     <Box sx={{ width: 38, height: 38, borderRadius: 2, display: 'grid', placeItems: 'center', color: '#0A0E1A', background: '#D4FF68' }}>{item.icon}</Box>
                     <Typography fontWeight={900}>{item.label}</Typography>
@@ -405,9 +537,9 @@ export default function LandingPage() {
               ))}
             </Box>
           </Box>
-        </Box>
+        </RevealBox>
 
-        <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, pb: { xs: 7, md: 9 } }}>
+        <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, pb: { xs: 7, md: 9 } }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.9fr 1.1fr' }, gap: { xs: 3, md: 5 }, alignItems: 'stretch' }}>
             <Box sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 4, background: 'rgba(15,20,38,0.72)', border: '1px solid rgba(255,255,255,0.1)' }}>
               <Chip label="Экономика точки" sx={{ mb: 2, color: '#0A0E1A', background: '#D4FF68', fontWeight: 900 }} />
@@ -418,9 +550,9 @@ export default function LandingPage() {
                 Пример ниже рассчитан по базовой цене 200 ₽ за час. Реальная экономика зависит от локации, потока людей и загрузки кабинок.
               </Typography>
             </Box>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
+            <Box component={motion.div} variants={stagger} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
               {economyCases.map((item) => (
-                <Box key={item.cabins} sx={{ p: 2.2, borderRadius: 3, background: 'linear-gradient(180deg, rgba(124,77,255,0.16), rgba(255,255,255,0.035))', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <Box key={item.cabins} component={motion.div} variants={cardReveal} whileHover={hoverLift} sx={{ p: 2.2, borderRadius: 3, background: 'linear-gradient(180deg, rgba(124,77,255,0.16), rgba(255,255,255,0.035))', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <Typography variant="h6" fontWeight={900}>{item.cabins}</Typography>
                   <Typography variant="caption" color="text.secondary">{item.hours}</Typography>
                   <Typography variant="h4" fontWeight={900} sx={{ my: 1.25, color: '#D4FF68' }}>{item.revenue}</Typography>
@@ -429,10 +561,10 @@ export default function LandingPage() {
               ))}
             </Box>
           </Box>
-        </Box>
+        </RevealBox>
 
         <Box sx={{ background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.026) 34%, rgba(255,255,255,0.018) 76%, transparent 100%)' }}>
-          <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 6, md: 7 } }}>
+          <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 6, md: 7 } }}>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.86fr 1.14fr' }, gap: { xs: 3, md: 5 }, alignItems: 'center' }}>
               <Box>
                 <Chip label="Почему нам доверять" sx={{ mb: 2, color: '#9AF4FF', background: 'rgba(0,229,255,0.08)' }} />
@@ -443,9 +575,9 @@ export default function LandingPage() {
                   Мы объединяем производство, приложение и операционный сценарий, чтобы партнер мог запускать точки по единому стандарту.
                 </Typography>
               </Box>
-              <Box sx={{ display: 'grid', gap: 1.25 }}>
+              <Box component={motion.div} variants={stagger} sx={{ display: 'grid', gap: 1.25 }}>
                 {trustPoints.map((point, index) => (
-                  <Box key={point} sx={{ display: 'grid', gridTemplateColumns: '40px 1fr', gap: 1.5, alignItems: 'center', p: 1.75, borderRadius: 2.5, background: 'rgba(15,20,38,0.72)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <Box key={point} component={motion.div} variants={cardReveal} whileHover={{ x: 8 }} sx={{ display: 'grid', gridTemplateColumns: '40px 1fr', gap: 1.5, alignItems: 'center', p: 1.75, borderRadius: 2.5, background: 'rgba(15,20,38,0.72)', border: '1px solid rgba(255,255,255,0.1)' }}>
                     <Box sx={{ width: 40, height: 40, borderRadius: 2, display: 'grid', placeItems: 'center', background: index % 2 ? '#00E5FF' : '#D4FF68', color: '#0A0E1A' }}>
                       <CheckCircle />
                     </Box>
@@ -454,13 +586,22 @@ export default function LandingPage() {
                 ))}
               </Box>
             </Box>
-          </Box>
+          </RevealBox>
         </Box>
 
-        <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 7, md: 9 }, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.08fr 0.92fr' }, gap: { xs: 4, md: 7 }, alignItems: 'center' }}>
+        <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 7, md: 9 }, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.08fr 0.92fr' }, gap: { xs: 4, md: 7 }, alignItems: 'center' }}>
           <Box sx={{ position: 'relative' }}>
             {productionSteps.map((step, index) => (
-              <Box key={step} sx={{ display: 'grid', gridTemplateColumns: { xs: '42px 1fr', sm: '52px 1fr' }, gap: { xs: 0.75, sm: 1 }, alignItems: 'center', mb: index === productionSteps.length - 1 ? 0 : 2.25, position: 'relative' }}>
+              <Box
+                key={step}
+                component={motion.div}
+                initial={{ opacity: 0, x: -26 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={viewport}
+                transition={{ duration: 0.46, delay: index * 0.07 }}
+                whileHover={{ x: 8 }}
+                sx={{ display: 'grid', gridTemplateColumns: { xs: '42px 1fr', sm: '52px 1fr' }, gap: { xs: 0.75, sm: 1 }, alignItems: 'center', mb: index === productionSteps.length - 1 ? 0 : 2.25, position: 'relative' }}
+              >
                 <Typography
                   variant="h2"
                   fontWeight={950}
@@ -491,9 +632,9 @@ export default function LandingPage() {
               Партнер получает не только приложение, а готовую физическую единицу сервиса: кабину, стандарт качества и подключение к системе бронирования.
             </Typography>
           </Box>
-        </Box>
+        </RevealBox>
 
-        <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, pb: { xs: 7, md: 9 } }}>
+        <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, pb: { xs: 7, md: 9 } }}>
           <Box sx={{ mb: 3 }}>
             <Chip icon={<Workspaces />} label="Команда" sx={{ mb: 2, color: '#D4FF68', background: 'rgba(212,255,104,0.08)' }} />
             <Typography variant="h3" component="h2" fontWeight={900} sx={{ fontSize: { xs: '2rem', md: '2.7rem' }, letterSpacing: 0 }}>
@@ -503,15 +644,15 @@ export default function LandingPage() {
               За SoundBox отвечает команда, которая закрывает ключевые направления: стратегию, продукт, производство и продажи.
             </Typography>
           </Box>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+          <Box component={motion.div} variants={stagger} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
             {teamMembers.map((member, index) => (
-              <Box key={member.role} sx={{ p: 2, borderRadius: 3, background: 'rgba(15,20,38,0.72)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <Box key={member.role} component={motion.div} variants={cardReveal} whileHover={hoverLift} sx={{ p: 2, borderRadius: 3, background: 'rgba(15,20,38,0.72)', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <Box sx={{ aspectRatio: '1 / 1', borderRadius: 2.5, mb: 1.75, display: 'grid', placeItems: 'center', background: index % 2 ? 'linear-gradient(135deg, rgba(0,229,255,0.18), rgba(124,77,255,0.2))' : 'linear-gradient(135deg, rgba(212,255,104,0.16), rgba(0,229,255,0.13))', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
                   <Box
                     component="img"
                     src={member.photo}
                     alt={member.name}
-                    sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.5s ease', '.MuiBox-root:hover &': { transform: 'scale(1.06)' } }}
                   />
                 </Box>
                 <Typography variant="h6" fontWeight={900}>{member.name}</Typography>
@@ -520,11 +661,12 @@ export default function LandingPage() {
               </Box>
             ))}
           </Box>
-        </Box>
+        </RevealBox>
 
-        <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, pb: { xs: 7, md: 9 } }}>
-          <Box sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 4, background: 'linear-gradient(135deg, rgba(124,77,255,0.22), rgba(0,229,255,0.1))', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between">
+        <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, pb: { xs: 7, md: 9 } }}>
+          <Box sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 4, background: 'linear-gradient(135deg, rgba(124,77,255,0.22), rgba(0,229,255,0.1))', border: '1px solid rgba(255,255,255,0.1)', position: 'relative', overflow: 'hidden' }}>
+            <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.09) 45%, transparent 70%)', transform: 'translateX(-120%)', animation: 'landing-scan 8s ease-in-out infinite', pointerEvents: 'none', zIndex: 0 }} />
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between" sx={{ position: 'relative', zIndex: 1 }}>
               <Box>
                 <Typography variant="h4" component="h2" fontWeight={900}>Откройте приложение или оставьте заявку на франшизу</Typography>
                 <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 690 }}>
@@ -540,14 +682,14 @@ export default function LandingPage() {
                 </Button>
               </Stack>
             </Stack>
-            <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.1)' }} />
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
+            <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.1)', position: 'relative', zIndex: 1 }} />
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1.5, position: 'relative', zIndex: 1 }}>
               {mvpFeatures.map((feature) => (
                 <Chip key={feature.label} icon={feature.icon} label={feature.label} variant="outlined" sx={{ justifyContent: 'flex-start', py: 2.4, borderColor: 'rgba(255,255,255,0.14)' }} />
               ))}
             </Box>
           </Box>
-        </Box>
+        </RevealBox>
 
         <Box component="footer" sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: 4, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between', color: 'text.secondary', background: 'linear-gradient(180deg, rgba(255,255,255,0.035), transparent 42%)' }}>
           <Typography variant="body2">SoundBox: тихие кабинки, цифровая платформа и франшиза</Typography>

@@ -107,9 +107,67 @@ html, body, #root {
   }
 }
 
+@keyframes landing-shine {
+  0% {
+    background-position: 220% 50%;
+  }
+  100% {
+    background-position: -120% 50%;
+  }
+}
+
+@keyframes landing-header-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes landing-ambient {
+  0% {
+    background-position: 0% 0%, 100% 0%, 50% 50%;
+  }
+  100% {
+    background-position: 28% 12%, 78% 22%, 50% 50%;
+  }
+}
+
+@keyframes landing-scan {
+  0%, 58% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes landing-grow-line {
+  from {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 @media (pointer: coarse), (prefers-reduced-motion: reduce) {
   .cursor-comet {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
   }
 }
 

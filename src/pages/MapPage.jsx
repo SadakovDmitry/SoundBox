@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, IconButton, Dialog, DialogTitle, DialogContent,
   DialogActions, Chip, Rating, Skeleton, Divider, Alert,
+  TextField, MenuItem, InputAdornment,
 } from '@mui/material';
 import {
-  ArrowBack, VolumeOff, AccessTime, LocationOn, Close,
+  ArrowBack, AccessTime, LocationOn, Close,
   EventAvailable, CheckCircle, MyLocation, AccountBalanceWallet,
+  Search, Tune, Star,
 } from '@mui/icons-material';
-import { MapContainer, TileLayer, Marker, Popup, useMap, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -72,6 +74,10 @@ function createCabinIcon(status = 'free') {
     occupied: {
       background: 'linear-gradient(135deg, #FF5252, #FF1744)',
       shadow: '0 4px 20px rgba(255,82,82,0.5)',
+    },
+    maintenance: {
+      background: 'linear-gradient(135deg, #90A4AE, #546E7A)',
+      shadow: '0 4px 20px rgba(144,164,174,0.38)',
     },
   };
   const colors = palette[status] || palette.free;
@@ -476,11 +482,17 @@ function BookingModal({ open, cabin, onClose, onBooked }) {
         style: { background: '#1a1a2e', color: '#fff', border: '1px solid #7C4DFF' },
         duration: 4000,
       });
-      // Auto-close modal after short delay
-      setTimeout(() => {
-        onClose(true);
-        if (onBooked) onBooked();
-      }, 800);
+      onClose(true);
+      if (onBooked) {
+        onBooked({
+          cabinName: cabin.name,
+          address: cabin.address,
+          time: selectedInterval.label,
+          duration: formatDuration(selectedInterval.durationMinutes),
+          totalPrice,
+          balanceAfter: balance - totalPrice,
+        });
+      }
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -514,7 +526,7 @@ function BookingModal({ open, cabin, onClose, onBooked }) {
         },
       }}
     >
-      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: { xs: 2, sm: 3 }, pt: { xs: 2, sm: 2 } }}>
+      <DialogTitle component="div" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: { xs: 2, sm: 3 }, pt: { xs: 2, sm: 2 } }}>
         <Box>
           <Typography variant="h6" fontWeight={700}>{cabin.name}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
@@ -649,12 +661,51 @@ function BookingModal({ open, cabin, onClose, onBooked }) {
   );
 }
 
+function BookingSuccessDialog({ details, onClose, onDashboard }) {
+  return (
+    <Dialog open={Boolean(details)} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle component="div">
+        <Typography variant="h6" fontWeight={800}>Бронь подтверждена</Typography>
+        <Typography variant="caption" color="text.secondary">Кабинка появится в личном кабинете</Typography>
+      </DialogTitle>
+      <DialogContent>
+        <Box sx={{
+          p: 2,
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(124,77,255,0.18), rgba(0,229,255,0.1))',
+          border: '1px solid rgba(124,77,255,0.25)',
+        }}>
+          <Typography fontWeight={900}>{details?.cabinName}</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{details?.address}</Typography>
+          <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />
+          <Typography variant="body2">{details?.time} · {details?.duration}</Typography>
+          <Typography variant="h6" color="secondary.main" fontWeight={900} sx={{ mt: 1 }}>
+            {details?.totalPrice} ₽
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Баланс после списания: {details?.balanceAfter} ₽
+          </Typography>
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button variant="outlined" onClick={onClose}>Остаться на карте</Button>
+        <Button variant="contained" onClick={onDashboard}>В личный кабинет</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function MapPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [cabins, setCabins] = useState([]);
   const [selectedCabin, setSelectedCabin] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [successDetails, setSuccessDetails] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [minRating, setMinRating] = useState('0');
+  const [amenityFilter, setAmenityFilter] = useState('all');
 
   const fetchCabins = async () => {
     try {
@@ -669,6 +720,30 @@ export default function MapPage() {
     queueMicrotask(fetchCabins);
   }, []);
 
+  const amenityOptions = useMemo(() => {
+    const values = new Set();
+    cabins.forEach((cabin) => {
+      try {
+        JSON.parse(cabin.amenities || '[]').forEach((item) => values.add(item));
+      } catch {
+        // Ignore malformed amenity lists from old data.
+      }
+    });
+    return [...values].sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [cabins]);
+
+  const filteredCabins = useMemo(() => cabins.filter((cabin) => {
+    const query = searchQuery.trim().toLowerCase();
+    const amenities = JSON.parse(cabin.amenities || '[]');
+    const matchesQuery = !query
+      || cabin.name.toLowerCase().includes(query)
+      || cabin.address.toLowerCase().includes(query);
+    const matchesStatus = statusFilter === 'all' || cabin.status === statusFilter;
+    const matchesRating = Number(cabin.rating || 0) >= Number(minRating || 0);
+    const matchesAmenity = amenityFilter === 'all' || amenities.includes(amenityFilter);
+    return matchesQuery && matchesStatus && matchesRating && matchesAmenity;
+  }), [amenityFilter, cabins, minRating, searchQuery, statusFilter]);
+
   const handleMarkerClick = (cabin) => {
     setSelectedCabin(cabin);
     setModalOpen(true);
@@ -679,9 +754,9 @@ export default function MapPage() {
     if (booked) fetchCabins();
   };
 
-  const handleBooked = () => {
-    // Navigate to dashboard after a short delay to let the user see confetti
-    setTimeout(() => navigate('/dashboard'), 1200);
+  const handleBooked = (details) => {
+    setSuccessDetails(details);
+    fetchCabins();
   };
 
   return (
@@ -748,8 +823,99 @@ export default function MapPage() {
         >
           <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <LocationOn sx={{ fontSize: 14, color: 'primary.main' }} />
-            {cabins.length} кабинок
+            {filteredCabins.length} из {cabins.length} кабинок
           </Typography>
+        </Box>
+      </Box>
+
+      {/* Filters */}
+      <Box
+        component={motion.div}
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+        sx={{
+          position: 'absolute',
+          top: { xs: 66, sm: 76 },
+          right: { xs: 12, sm: 16 },
+          left: { xs: 12, md: 'auto' },
+          zIndex: 1000,
+          width: { xs: 'auto', md: 520 },
+          p: 1.25,
+          borderRadius: 3,
+          background: 'rgba(15, 20, 38, 0.88)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(124,77,255,0.22)',
+          boxShadow: '0 10px 36px rgba(0,0,0,0.28)',
+        }}
+      >
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1.3fr 0.9fr' }, gap: 1 }}>
+          <TextField
+            size="small"
+            placeholder="Поиск по названию или адресу"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ fontSize: 18, color: 'secondary.main' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            select
+            size="small"
+            label="Статус"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Tune sx={{ fontSize: 18, color: 'primary.main' }} />
+                </InputAdornment>
+              ),
+            }}
+          >
+            <MenuItem value="all">Все</MenuItem>
+            <MenuItem value="free">Свободны</MenuItem>
+            <MenuItem value="soon">Скоро бронь</MenuItem>
+            <MenuItem value="occupied">Заняты</MenuItem>
+            <MenuItem value="maintenance">На обслуживании</MenuItem>
+          </TextField>
+        </Box>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '0.9fr 1.1fr' }, gap: 1, mt: 1 }}>
+          <TextField
+            select
+            size="small"
+            label="Рейтинг"
+            value={minRating}
+            onChange={(event) => setMinRating(event.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Star sx={{ fontSize: 18, color: '#D4FF68' }} />
+                </InputAdornment>
+              ),
+            }}
+          >
+            <MenuItem value="0">Любой</MenuItem>
+            <MenuItem value="4.5">от 4.5</MenuItem>
+            <MenuItem value="4.7">от 4.7</MenuItem>
+            <MenuItem value="4.9">от 4.9</MenuItem>
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="Удобство"
+            value={amenityFilter}
+            onChange={(event) => setAmenityFilter(event.target.value)}
+          >
+            <MenuItem value="all">Все удобства</MenuItem>
+            {amenityOptions.map((amenity) => (
+              <MenuItem key={amenity} value={amenity}>{amenity}</MenuItem>
+            ))}
+          </TextField>
         </Box>
       </Box>
 
@@ -782,6 +948,10 @@ export default function MapPage() {
           <Box sx={{ width: 12, height: 12, borderRadius: '50%', background: 'linear-gradient(135deg, #FF5252, #FF1744)' }} />
           <Typography variant="caption" color="text.secondary">Занята</Typography>
         </Box>
+        <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
+          <Box sx={{ width: 12, height: 12, borderRadius: '50%', background: 'linear-gradient(135deg, #90A4AE, #546E7A)' }} />
+          <Typography variant="caption" color="text.secondary">Сервис</Typography>
+        </Box>
       </Box>
 
       {/* Map */}
@@ -795,7 +965,7 @@ export default function MapPage() {
           attribution='&copy; <a href="https://carto.com">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
-        {cabins.map((cabin) => (
+        {filteredCabins.map((cabin) => (
           <Marker
             key={cabin.id}
             position={[cabin.lat, cabin.lng]}
@@ -815,6 +985,11 @@ export default function MapPage() {
         cabin={selectedCabin}
         onClose={handleModalClose}
         onBooked={handleBooked}
+      />
+      <BookingSuccessDialog
+        details={successDetails}
+        onClose={() => setSuccessDetails(null)}
+        onDashboard={() => navigate('/dashboard')}
       />
     </Box>
   );

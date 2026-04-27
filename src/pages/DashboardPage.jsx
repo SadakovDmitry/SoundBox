@@ -333,7 +333,7 @@ function ProfileDialog({ open, onClose, user, onUpdated }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
+      <DialogTitle component="div" sx={{ textAlign: 'center', pb: 1 }}>
         <Typography variant="h6" fontWeight={700}>Мой профиль</Typography>
       </DialogTitle>
       <DialogContent sx={{ textAlign: 'center', pt: 2 }}>
@@ -427,7 +427,7 @@ function TopUpDialog({ open, onClose, onUpdated }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>
+      <DialogTitle component="div">
         <Typography variant="h6" fontWeight={700}>Пополнить кошелёк</Typography>
         <Typography variant="caption" color="text.secondary">Демо-оплата начисляет виртуальные деньги</Typography>
       </DialogTitle>
@@ -508,6 +508,69 @@ function NotificationsCard({ notifications }) {
   );
 }
 
+function NextBookingHero({ booking, onBook }) {
+  if (!booking) return null;
+  const start = new Date(booking.start_time);
+  const end = new Date(booking.end_time);
+  const now = new Date();
+  const isActive = now >= start && now <= end;
+
+  return (
+    <Card component={motion.div} variants={itemVariants} sx={{ mb: { xs: 2, sm: 3 }, overflow: 'hidden' }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <Typography variant="caption" color="secondary.main" fontWeight={800}>
+          {isActive ? 'Активная бронь' : 'Ближайшая бронь'}
+        </Typography>
+        <Typography variant="h6" fontWeight={800} sx={{ mt: 0.75 }}>{booking.cabin_name}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          {booking.cabin_address}
+        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'center', flexWrap: 'wrap', mt: 2 }}>
+          <Box>
+            <Typography variant="body2" fontWeight={800}>
+              {format(start, 'dd MMM, HH:mm', { locale: ru })} — {format(end, 'HH:mm', { locale: ru })}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {isActive ? 'Можно открыть кабинку из блока активных броней ниже' : 'Мы напомним перед началом'}
+            </Typography>
+          </Box>
+          <Button variant="contained" startIcon={<MapIcon />} onClick={onBook}>
+            Новая бронь
+          </Button>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
+function OnboardingCard({ hidden }) {
+  if (hidden) return null;
+  return (
+    <Card component={motion.div} variants={itemVariants} sx={{ mb: { xs: 2, sm: 3 } }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 2 }}>Первое бронирование за минуту</Typography>
+        {[
+          { step: '1', text: 'Выберите кабинку на карте' },
+          { step: '2', text: 'Отметьте дату и свободный интервал' },
+          { step: '3', text: 'Подтвердите бронь и откройте кабинку из приложения' },
+        ].map((item) => (
+          <Box key={item.step} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.25 }}>
+            <Box sx={{
+              width: 30, height: 30, borderRadius: 2,
+              display: 'grid', placeItems: 'center',
+              color: '#0A0E1A', background: 'linear-gradient(135deg, #D4FF68, #00E5FF)',
+              fontWeight: 900,
+            }}>
+              {item.step}
+            </Box>
+            <Typography variant="body2" color="text.secondary">{item.text}</Typography>
+          </Box>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ReviewDialog({ booking, open, onClose, onSaved }) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
@@ -537,7 +600,7 @@ function ReviewDialog({ booking, open, onClose, onSaved }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>
+      <DialogTitle component="div">
         <Typography variant="h6" fontWeight={700}>
           {isAutoPrompt ? 'Как прошла бронь?' : 'Оценить бронирование'}
         </Typography>
@@ -652,6 +715,8 @@ export default function DashboardPage() {
   // Merge consecutive and sort by proximity
   const activeBookings = sortByProximity(mergeConsecutiveBookings(rawActive));
   const pastBookings = mergeConsecutiveBookings(rawPast);
+  const nextBooking = activeBookings[0] || null;
+  const userRole = user?.role || 'client';
 
   const avatarUrl = getFullUrl(user?.avatar_url);
   const avatarInitials = user?.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
@@ -690,7 +755,9 @@ export default function DashboardPage() {
             </Box>
             <Box>
               <Typography variant="h6" fontWeight={700} sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>Привет, {user?.name?.split(' ')[0]}!</Typography>
-              <Typography variant="caption" color="text.secondary">Личный кабинет</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {userRole === 'admin' ? 'Администратор' : userRole === 'partner' ? 'Партнёр' : 'Личный кабинет'}
+              </Typography>
             </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -711,8 +778,10 @@ export default function DashboardPage() {
           </Box>
         </Box>
 
+        <NextBookingHero booking={nextBooking} onBook={() => navigate('/map')} />
         <WalletCard user={user} wallet={wallet} onTopUp={() => setTopUpOpen(true)} />
         <NotificationsCard notifications={notifications} />
+        <OnboardingCard hidden={bookings.length > 0} />
 
         {/* Welcome Card */}
         <Card component={motion.div} variants={itemVariants} sx={{ mb: { xs: 2, sm: 3 }, overflow: 'hidden', position: 'relative' }}>
