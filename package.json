@@ -3,9 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "concurrently \"vite\" \"node server.js\"",
     "start": "node server.js",
+    "start:prod": "NODE_ENV=production node server.js",
     "server": "node server.js",
     "client": "vite",
     "build": "vite build",

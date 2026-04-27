@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+cabins.db
+cabins.db-shm
+cabins.db-wal
+uploads
+data
 
 # Editor directories and files
 .vscode/*

@@ -15,6 +15,29 @@ npm run dev
 - **Frontend**: http://localhost:5173 (или следующий свободный порт)
 - **API Server**: http://localhost:3001
 
+## 🌍 Деплой на хостинг
+
+Проект деплоится как full-stack Node-приложение: Vite собирает фронтенд в `dist`, а `server.js` отдаёт API и готовый сайт.
+
+### Render
+
+1. Загрузите проект в GitHub.
+2. Откройте Render → **New** → **Blueprint**.
+3. Выберите репозиторий SoundBox.
+4. Render прочитает `render.yaml` и сам создаст web-service на плане `starter`, потому что для SQLite нужен persistent disk.
+5. Build command: `npm install && npm run build`.
+6. Start command: `npm start`.
+
+В `render.yaml` уже настроены:
+- `JWT_SECRET` — генерируется автоматически.
+- `DB_PATH=/var/data/cabins.db` — SQLite хранится на постоянном диске.
+- `UPLOADS_DIR=/var/data/uploads` — аватарки пользователей тоже хранятся на диске.
+- `/api/health` — health-check для хостинга.
+
+Локальные файлы базы `cabins.db`, `cabins.db-shm`, `cabins.db-wal` и папка `uploads` не нужно коммитить: на хостинге база создастся и заполнится стартовыми кабинками автоматически.
+
+Если нужен полностью бесплатный демо-деплой, можно убрать блок `disk` из `render.yaml` и заменить `DB_PATH`/`UPLOADS_DIR` на локальные пути, но данные пользователей и бронирований могут сбрасываться при рестарте сервиса.
+
 ## 📱 Возможности
 
 ### Лендинг и франшиза

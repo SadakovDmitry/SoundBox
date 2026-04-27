@@ -12,13 +12,22 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = 'cabins-secret-key-2024';
+const JWT_SECRET = process.env.JWT_SECRET || 'cabins-secret-key-2024';
+const DB_PATH = process.env.DB_PATH || join(__dirname, 'cabins.db');
+const uploadsDir = process.env.UPLOADS_DIR || join(__dirname, 'uploads');
+
+const dbDir = dirname(DB_PATH);
+if (!existsSync(dbDir)) mkdirSync(dbDir, { recursive: true });
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, service: 'soundbox', time: new Date().toISOString() });
+});
+
 // ─── Database Setup ──────────────────────────────────────────
-const db = new Database(join(__dirname, 'cabins.db'));
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
@@ -121,8 +130,7 @@ try { db.exec('ALTER TABLE franchise_leads ADD COLUMN status TEXT DEFAULT "Но�
 try { db.exec('ALTER TABLE franchise_leads ADD COLUMN manager_note TEXT'); } catch { /* column may already exist */ }
 
 // Ensure uploads directory exists
-const uploadsDir = join(__dirname, 'uploads');
-if (!existsSync(uploadsDir)) mkdirSync(uploadsDir);
+if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
 
 // ─── Seed Cabins ─────────────────────────────────────────────
 const cabinCount = db.prepare('SELECT COUNT(*) as count FROM cabins').get().count;
