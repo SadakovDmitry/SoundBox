@@ -3,7 +3,7 @@ import {
   Box, Button, Chip, Divider, IconButton, Stack, Typography,
 } from '@mui/material';
 import {
-  Analytics, Apartment, ArrowForward, CheckCircle, Factory, Handshake,
+  Analytics, Apartment, ArrowForward, CheckCircle, Handshake,
   HeadsetMic, Login, Map as MapIcon, MonetizationOn, Payments, School,
   Shield, Speed, Storefront, SupportAgent, Train, TrendingUp, VolumeOff,
   Workspaces,
@@ -58,7 +58,7 @@ const valueCards = [
   {
     icon: <VolumeOff />,
     title: 'Тишина там, где ее не хватает',
-    text: 'SoundBox решает понятную боль офисов, вузов, ТЦ и коворкингов: людям нужно место для звонка, фокуса и короткой работы без шума.',
+    text: 'AcoustiQ решает понятную боль офисов, вузов, ТЦ и коворкингов: людям нужно место для звонка, фокуса и короткой работы без шума.',
   },
   {
     icon: <MapIcon />,
@@ -66,9 +66,9 @@ const valueCards = [
     text: 'Пользователь видит кабинки на карте, выбирает свободное время, управляет бронью в личном кабинете и открывает кабинку в нужный момент.',
   },
   {
-    icon: <Factory />,
-    title: 'Контроль продукта внутри команды',
-    text: 'Кабинки проектируются и собираются под единый стандарт SoundBox, поэтому в разных локациях сохраняется одинаковый уровень качества.',
+    icon: <Shield />,
+    title: 'Единый стандарт сервиса',
+    text: 'В разных локациях сохраняется одинаковый сценарий бронирования, доступа и пользовательского опыта.',
   },
   {
     icon: <TrendingUp />,
@@ -80,7 +80,7 @@ const valueCards = [
 const strengths = [
   { icon: <CheckCircle />, label: 'Готовый пользовательский путь', text: 'От регистрации до бронирования и открытия кабинки все собрано в одном сценарии.' },
   { icon: <Payments />, label: 'Простая экономика', text: 'Почасовая бронь делает выручку понятной, а загрузку легко считать по каждой точке.' },
-  { icon: <Shield />, label: 'Единый стандарт качества', text: 'Собственное производство помогает держать одинаковый уровень кабинок в разных локациях.' },
+  { icon: <Shield />, label: 'Единый стандарт качества', text: 'Единые правила запуска и сервиса помогают держать одинаковый уровень кабинок в разных локациях.' },
   { icon: <HeadsetMic />, label: 'Сильный B2B-сценарий', text: 'Кабинки подходят бизнес-центрам, университетам, коворкингам, ТЦ и вокзалам.' },
   { icon: <Analytics />, label: 'Данные для роста', text: 'Платформа собирает бронирования, историю и статусы, чтобы дальше развивать аналитику.' },
   { icon: <SupportAgent />, label: 'Понятный сервис', text: 'Пользователь сам бронирует время и получает доступ без лишнего общения с администратором.' },
@@ -119,36 +119,29 @@ const audienceCards = [
 
 const workSteps = [
   'Выбираем локацию и место установки',
-  'Устанавливаем звукоизолированную кабинку',
+  'Подготавливаем точку и схему размещения кабинок',
   'Подключаем платформу бронирования',
   'Пользователи выбирают время в приложении',
   'Владелец точки получает доход от бронирований',
 ];
 
 const economyCases = [
-  { cabins: '1 кабинка', hours: '50 ч/мес', revenue: '10 000 ₽', note: 'подходит для теста спроса' },
-  { cabins: '3 кабинки', hours: '150 ч/мес', revenue: '30 000 ₽', note: 'формат для бизнес-центра или вуза' },
-  { cabins: '5 кабинок', hours: '250 ч/мес', revenue: '50 000 ₽', note: 'мини-сеть внутри крупной локации' },
+  { cabins: '1 кабинка', hours: '5 броней/день', revenue: '45 000 ₽', note: 'чистая прибыль 24 750 ₽ в месяц' },
+  { cabins: '3 кабинки', hours: '5 броней/день', revenue: '135 000 ₽', note: 'чистая прибыль 74 250 ₽ в месяц' },
+  { cabins: '5 кабинок', hours: '5 броней/день', revenue: '225 000 ₽', note: 'чистая прибыль 123 750 ₽ в месяц' },
 ];
 
 const trustPoints = [
-  'Собственное производство и единый стандарт сборки',
+  'Единый стандарт запуска и обслуживания',
   'Цифровая платформа с бронированием, кошельком и историей',
   'Управление доступом во время активной брони',
   'Модель масштабируется от одной точки до сети кабинок',
 ];
 
-const productionSteps = [
-  'Проектируем форму кабины, акустический контур и внутреннюю эргономику',
-  'Собираем модули, вентиляцию, электрику и элементы доступа',
-  'Проверяем качество, безопасность и готовность к установке на точке',
-  'Подключаем кабинку к платформе бронирования SoundBox',
-];
-
 const metrics = [
-  { value: '10', label: 'локаций по Москве' },
-  { value: '24/7', label: 'кабинки работают круглосуточно' },
-  { value: '200 ₽', label: 'базовая цена часа' },
+  { value: '255 000 ₽', label: 'старт одной кабинки с монтажом' },
+  { value: '45 000 ₽', label: 'оборот одной кабинки в месяц' },
+  { value: '10.3 мес', label: 'средняя окупаемость точки' },
 ];
 
 const mvpFeatures = [
@@ -233,7 +226,7 @@ export default function LandingPage() {
               transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
               sx={{ width: 34, height: 34, filter: 'drop-shadow(0 0 16px rgba(124,77,255,0.45))' }}
             />
-            <Typography variant="subtitle1" fontWeight={800}>SoundBox</Typography>
+            <Typography variant="subtitle1" fontWeight={800}>AcoustiQ</Typography>
           </Box>
           <Stack direction="row" spacing={{ xs: 0.5, sm: 1 }} alignItems="center">
             <Button
@@ -320,13 +313,13 @@ export default function LandingPage() {
                 animation: 'landing-shine 8s linear infinite',
               }}
             >
-              SoundBox
+              AcoustiQ
             </Typography>
             <Typography variant="h4" component="p" fontWeight={800} sx={{ mt: 1.5, color: '#D4FF68', letterSpacing: 0, fontSize: { xs: '1.45rem', md: '2rem' } }}>
               Тишина как сервис
             </Typography>
             <Typography variant="h5" sx={{ mt: 2.5, color: 'rgba(255,255,255,0.82)', lineHeight: 1.48, maxWidth: 700, fontSize: { xs: '1.05rem', md: '1.28rem' } }}>
-              Производим звукоизолированные кабинки, подключаем их к приложению бронирования и даем партнерам готовый формат запуска.
+              Подключаем тихие кабинки к цифровому сервису бронирования и даем партнерам готовый формат запуска.
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 4 }}>
               <Button component={RouterLink} to="/franchise" variant="contained" size="large" startIcon={<Storefront />} endIcon={<ArrowForward />}>
@@ -397,10 +390,10 @@ export default function LandingPage() {
         <Box sx={{ background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.025) 32%, rgba(255,255,255,0.025) 68%, transparent 100%)' }}>
           <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 5, md: 6 } }}>
             <Typography variant="h3" component="h2" fontWeight={900} sx={{ fontSize: { xs: '2rem', md: '2.7rem' }, letterSpacing: 0, mb: 1 }}>
-              Почему SoundBox выбирают для современных пространств
+              Почему AcoustiQ выбирают для современных пространств
             </Typography>
             <Typography color="text.secondary" sx={{ maxWidth: 760, lineHeight: 1.8, mb: 3 }}>
-              SoundBox объединяет физический продукт, цифровой сервис и понятную модель запуска для мест с высоким потоком людей.
+              AcoustiQ объединяет тихие кабинки, цифровой сервис и понятную модель запуска для мест с высоким потоком людей.
             </Typography>
             <Box component={motion.div} variants={stagger} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
               {valueCards.map((item) => (
@@ -424,12 +417,12 @@ export default function LandingPage() {
         <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 7, md: 9 } }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.72fr 1.28fr' }, gap: { xs: 3, md: 5 }, alignItems: 'start' }}>
             <Box sx={{ position: { md: 'sticky' }, top: 96 }}>
-              <Chip label="Для кого SoundBox" sx={{ mb: 2, color: '#D4FF68', background: 'rgba(212,255,104,0.08)' }} />
+              <Chip label="Для кого AcoustiQ" sx={{ mb: 2, color: '#D4FF68', background: 'rgba(212,255,104,0.08)' }} />
               <Typography variant="h3" component="h2" fontWeight={900} sx={{ fontSize: { xs: '2rem', md: '2.7rem' }, letterSpacing: 0 }}>
                 Тихие кабинки работают там, где людям нужен фокус
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 1.5, lineHeight: 1.8 }}>
-                SoundBox можно поставить в локациях с постоянным потоком людей и превратить свободные метры в полезный платный сервис.
+                AcoustiQ можно поставить в локациях с постоянным потоком людей и превратить свободные метры в полезный платный сервис.
               </Typography>
             </Box>
             <Box sx={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden', background: 'rgba(15,20,38,0.62)' }}>
@@ -519,10 +512,10 @@ export default function LandingPage() {
             <Box>
             <Chip label="Плюсы для пользователей и владельцев локаций" sx={{ mb: 2, color: '#D4FF68', background: 'rgba(212,255,104,0.08)' }} />
               <Typography variant="h3" component="h2" fontWeight={900} sx={{ fontSize: { xs: '2rem', md: '2.7rem' }, letterSpacing: 0 }}>
-                Что делает SoundBox полезным
+                Что делает AcoustiQ полезным
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 2, lineHeight: 1.8 }}>
-                SoundBox закрывает повседневную потребность в приватном пространстве и одновременно дает владельцу локации новый сервис, который можно монетизировать без сложной операционной команды.
+                AcoustiQ закрывает повседневную потребность в приватном пространстве и одновременно дает владельцу локации новый сервис, который можно монетизировать без сложной операционной команды.
               </Typography>
             </Box>
             <Box component={motion.div} variants={stagger} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
@@ -569,10 +562,10 @@ export default function LandingPage() {
               <Box>
                 <Chip label="Почему нам доверять" sx={{ mb: 2, color: '#9AF4FF', background: 'rgba(0,229,255,0.08)' }} />
                 <Typography variant="h3" component="h2" fontWeight={900} sx={{ fontSize: { xs: '2rem', md: '2.7rem' }, letterSpacing: 0 }}>
-                  SoundBox — не просто мебель, а управляемый сервис
+                  AcoustiQ — не просто кабинки, а управляемый сервис
                 </Typography>
                 <Typography color="text.secondary" sx={{ mt: 2, lineHeight: 1.8 }}>
-                  Мы объединяем производство, приложение и операционный сценарий, чтобы партнер мог запускать точки по единому стандарту.
+                  Мы объединяем приложение, операционный сценарий и стандарты запуска, чтобы партнер мог запускать точки по единому стандарту.
                 </Typography>
               </Box>
               <Box component={motion.div} variants={stagger} sx={{ display: 'grid', gap: 1.25 }}>
@@ -589,59 +582,14 @@ export default function LandingPage() {
           </RevealBox>
         </Box>
 
-        <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 7, md: 9 }, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.08fr 0.92fr' }, gap: { xs: 4, md: 7 }, alignItems: 'center' }}>
-          <Box sx={{ position: 'relative' }}>
-            {productionSteps.map((step, index) => (
-              <Box
-                key={step}
-                component={motion.div}
-                initial={{ opacity: 0, x: -26 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={viewport}
-                transition={{ duration: 0.46, delay: index * 0.07 }}
-                whileHover={{ x: 8 }}
-                sx={{ display: 'grid', gridTemplateColumns: { xs: '42px 1fr', sm: '52px 1fr' }, gap: { xs: 0.75, sm: 1 }, alignItems: 'center', mb: index === productionSteps.length - 1 ? 0 : 2.25, position: 'relative' }}
-              >
-                <Typography
-                  variant="h2"
-                  fontWeight={950}
-                  sx={{
-                    fontSize: { xs: '4rem', sm: '4.8rem' },
-                    lineHeight: 0.9,
-                    color: index % 2 ? '#00E5FF' : '#D4FF68',
-                    textShadow: index % 2 ? '0 0 24px rgba(0,229,255,0.22)' : '0 0 24px rgba(212,255,104,0.2)',
-                  }}
-                >
-                  {index + 1}
-                </Typography>
-                <Box sx={{ p: 2, borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <Typography variant="caption" sx={{ color: index % 2 ? '#00E5FF' : '#D4FF68', fontWeight: 900 }}>
-                    Этап {index + 1}
-                  </Typography>
-                  <Typography fontWeight={800} sx={{ mt: 0.4 }}>{step}</Typography>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-          <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-            <Chip label="Собственное производство" sx={{ mb: 2, color: '#9AF4FF', background: 'rgba(0,229,255,0.08)' }} />
-            <Typography variant="h3" component="h2" fontWeight={900} sx={{ fontSize: { xs: '2rem', md: '2.7rem' }, letterSpacing: 0 }}>
-              Мы контролируем не только приложение, но и саму кабинку
-            </Typography>
-            <Typography color="text.secondary" sx={{ mt: 2, lineHeight: 1.8, maxWidth: 560, ml: { md: 'auto' } }}>
-              Партнер получает не только приложение, а готовую физическую единицу сервиса: кабину, стандарт качества и подключение к системе бронирования.
-            </Typography>
-          </Box>
-        </RevealBox>
-
         <RevealBox sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, pb: { xs: 7, md: 9 } }}>
           <Box sx={{ mb: 3 }}>
             <Chip icon={<Workspaces />} label="Команда" sx={{ mb: 2, color: '#D4FF68', background: 'rgba(212,255,104,0.08)' }} />
             <Typography variant="h3" component="h2" fontWeight={900} sx={{ fontSize: { xs: '2rem', md: '2.7rem' }, letterSpacing: 0 }}>
-              Команда SoundBox
+              Команда AcoustiQ
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 1.5, maxWidth: 760, lineHeight: 1.8 }}>
-              За SoundBox отвечает команда, которая закрывает ключевые направления: стратегию, продукт, производство и продажи.
+              За AcoustiQ отвечает команда, которая закрывает ключевые направления: стратегию, продукт, цифровой сервис и продажи.
             </Typography>
           </Box>
           <Box component={motion.div} variants={stagger} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
@@ -670,7 +618,7 @@ export default function LandingPage() {
               <Box>
                 <Typography variant="h4" component="h2" fontWeight={900}>Откройте приложение или оставьте заявку на франшизу</Typography>
                 <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 690 }}>
-                  Посмотрите, как работает бронирование, или узнайте условия запуска SoundBox в своей локации.
+                  Посмотрите, как работает бронирование, или узнайте условия запуска AcoustiQ в своей локации.
                 </Typography>
               </Box>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
@@ -692,7 +640,7 @@ export default function LandingPage() {
         </RevealBox>
 
         <Box component="footer" sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: 4, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between', color: 'text.secondary', background: 'linear-gradient(180deg, rgba(255,255,255,0.035), transparent 42%)' }}>
-          <Typography variant="body2">SoundBox: тихие кабинки, цифровая платформа и франшиза</Typography>
+          <Typography variant="body2">AcoustiQ: тихие кабинки, цифровая платформа и франшиза</Typography>
           <Stack direction="row" spacing={2}>
             <Button component={RouterLink} to="/franchise" size="small" startIcon={<Handshake />}>Франшиза</Button>
             <Button component={RouterLink} to="/login" size="small">Войти</Button>

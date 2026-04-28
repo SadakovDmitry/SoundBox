@@ -4,7 +4,7 @@ import {
   Alert, Box, Button, Chip, Divider, MenuItem, Slider, Stack, TextField, Typography,
 } from '@mui/material';
 import {
-  ArrowBack, ArrowForward, CheckCircle, Factory, Handshake, LocationCity,
+  ArrowBack, ArrowForward, CheckCircle, Handshake, LocationCity,
   MonetizationOn, RocketLaunch, Storefront, SupportAgent,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
@@ -14,26 +14,26 @@ import { api } from '../api';
 const packages = [
   {
     title: 'Pilot',
-    price: 'от 1,2 млн ₽',
+    price: 'от 255 000 ₽',
     booths: '1-2 кабинки',
     text: 'Для проверки спроса в бизнес-центре, вузе, коворкинге или торговой галерее.',
   },
   {
     title: 'City',
-    price: 'от 3,6 млн ₽',
+    price: 'от 665 000 ₽',
     booths: '3-6 кабинок',
     text: 'Для запуска точки с заметным охватом и регулярным потоком бронирований.',
   },
   {
     title: 'Network',
-    price: 'индивидуально',
+    price: 'от 1,49 млн ₽',
     booths: '7+ кабинок',
     text: 'Для партнеров, которые хотят развивать сеть точек в своем городе или регионе.',
   },
 ];
 
 const included = [
-  { icon: <Factory />, title: 'Кабинки собственного производства', text: 'Корпус, акустика, вентиляция, электрика и подготовка к подключению.' },
+  { icon: <Storefront />, title: 'Готовый формат точки', text: 'Сценарий запуска, рекомендации по размещению и подготовка точки к подключению.' },
   { icon: <RocketLaunch />, title: 'Подключение платформы', text: 'Бронирование, карта, личный кабинет, управление доступом и история операций.' },
   { icon: <SupportAgent />, title: 'Операционная поддержка', text: 'Сценарии открытия точки, рекомендации по локации и базовые сервисные процессы.' },
 ];
@@ -47,10 +47,20 @@ const formatOptions = [
 ];
 
 const currency = new Intl.NumberFormat('ru-RU');
+const PRICE_PER_SESSION = 300;
+const DAYS_PER_MONTH = 30;
+const ROYALTY_RATE = 0.05;
+const TAX_RATE = 0.06;
+const UNIT_EQUIPMENT_COST = 185000;
+const UNIT_DELIVERY_COST = 20000;
+const FRANCHISE_FEE = 50000;
+const RENT_PER_BOOTH = 10000;
+const UTILITIES_PER_BOOTH = 800;
+const MAINTENANCE_PER_BOOTH = 4500;
 
 export default function FranchisePage() {
   const [booths, setBooths] = useState(3);
-  const [occupancy, setOccupancy] = useState(45);
+  const [bookingsPerDay, setBookingsPerDay] = useState(5);
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -63,16 +73,20 @@ export default function FranchisePage() {
   const [success, setSuccess] = useState(null);
 
   const estimate = useMemo(() => {
-    const workingHours = 14;
-    const pricePerHour = 200;
-    const days = 30;
-    const revenue = booths * workingHours * days * pricePerHour * (occupancy / 100);
-    const serviceCosts = revenue * 0.28;
+    const revenue = booths * bookingsPerDay * DAYS_PER_MONTH * PRICE_PER_SESSION;
+    const recurringCosts = booths * (RENT_PER_BOOTH + UTILITIES_PER_BOOTH + MAINTENANCE_PER_BOOTH);
+    const taxes = revenue * TAX_RATE;
+    const royalty = revenue * ROYALTY_RATE;
+    const costs = recurringCosts + taxes + royalty;
+    const capex = FRANCHISE_FEE + booths * (UNIT_EQUIPMENT_COST + UNIT_DELIVERY_COST);
     return {
       revenue: Math.round(revenue),
-      margin: Math.round(revenue - serviceCosts),
+      costs: Math.round(costs),
+      margin: Math.round(revenue - costs),
+      capex: Math.round(capex),
+      paybackMonths: revenue > costs ? Number((capex / (revenue - costs)).toFixed(1)) : null,
     };
-  }, [booths, occupancy]);
+  }, [booths, bookingsPerDay]);
 
   const handleChange = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -86,7 +100,7 @@ export default function FranchisePage() {
     try {
       const data = await api.submitFranchiseLead({
         ...form,
-        message: `${form.message}\n\nКалькулятор: ${booths} кабинок, загрузка ${occupancy}%, оборот ${currency.format(estimate.revenue)} ₽/мес.`,
+        message: `${form.message}\n\nКалькулятор: ${booths} кабинок, ${bookingsPerDay} бронир./день на кабинку, оборот ${currency.format(estimate.revenue)} ₽/мес., прибыль ${currency.format(estimate.margin)} ₽/мес.`,
       });
       setSuccess(data);
       setForm({
@@ -134,12 +148,12 @@ export default function FranchisePage() {
       >
         <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 5, md: 8 }, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.94fr 1.06fr' }, gap: { xs: 4, md: 7 }, alignItems: 'center' }}>
           <Box component={motion.section} initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }}>
-            <Chip label="Франшиза SoundBox" icon={<Handshake />} sx={{ mb: 2, color: '#D4FF68', background: 'rgba(212,255,104,0.09)' }} />
+            <Chip label="Франшиза AcoustiQ" icon={<Handshake />} sx={{ mb: 2, color: '#D4FF68', background: 'rgba(212,255,104,0.09)' }} />
             <Typography component="h1" variant="h2" fontWeight={900} sx={{ fontSize: { xs: '2.35rem', md: '4rem' }, lineHeight: 1, letterSpacing: 0 }}>
               Запустите точку тихих кабинок в своем городе
             </Typography>
             <Typography variant="h6" color="text.secondary" sx={{ mt: 2.5, lineHeight: 1.65, maxWidth: 680 }}>
-              Мы поставляем кабинки собственного производства, подключаем платформу бронирования и помогаем собрать операционную модель под локацию.
+              Мы подключаем платформу бронирования и помогаем собрать операционную модель под локацию с понятным сценарием запуска.
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 4 }}>
               <Button href="#lead-form" variant="contained" size="large" startIcon={<Storefront />}>
@@ -157,27 +171,40 @@ export default function FranchisePage() {
               <Typography variant="h5" fontWeight={900}>Калькулятор точки</Typography>
             </Stack>
             <Typography color="text.secondary" sx={{ mt: 1 }}>
-              Быстрая оценка месячного оборота по базовому тарифу бронирования.
+              Расчет по юнит-экономике из таблицы: средний чек 300 ₽, роялти 5%, налог 6%, аренда 10 000 ₽ и обслуживание 4 500 ₽ на кабинку.
             </Typography>
             <Box sx={{ mt: 3 }}>
               <Typography fontWeight={700}>Количество кабинок: {booths}</Typography>
               <Slider min={1} max={12} value={booths} onChange={(_, value) => setBooths(value)} marks={[{ value: 1, label: '1' }, { value: 6, label: '6' }, { value: 12, label: '12' }]} />
             </Box>
             <Box sx={{ mt: 2 }}>
-              <Typography fontWeight={700}>Средняя загрузка: {occupancy}%</Typography>
-              <Slider min={20} max={85} step={5} value={occupancy} onChange={(_, value) => setOccupancy(value)} marks={[{ value: 20, label: '20%' }, { value: 50, label: '50%' }, { value: 85, label: '85%' }]} />
+              <Typography fontWeight={700}>Бронирований в день на кабинку: {bookingsPerDay}</Typography>
+              <Slider min={1} max={10} step={1} value={bookingsPerDay} onChange={(_, value) => setBookingsPerDay(value)} marks={[{ value: 1, label: '1' }, { value: 5, label: '5' }, { value: 10, label: '10' }]} />
             </Box>
             <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.1)' }} />
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: 'rgba(124,77,255,0.08)', border: '1px solid rgba(124,77,255,0.18)' }}>
+                <Typography variant="caption" color="text.secondary">Стартовые инвестиции</Typography>
+                <Typography variant="h5" fontWeight={900}>{currency.format(estimate.capex)} ₽</Typography>
+              </Box>
               <Box sx={{ p: 2, borderRadius: 2, background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.18)' }}>
                 <Typography variant="caption" color="text.secondary">Оборот в месяц</Typography>
                 <Typography variant="h5" fontWeight={900}>{currency.format(estimate.revenue)} ₽</Typography>
+              </Box>
+              <Box sx={{ p: 2, borderRadius: 2, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                <Typography variant="caption" color="text.secondary">Расходы в месяц</Typography>
+                <Typography variant="h5" fontWeight={900}>{currency.format(estimate.costs)} ₽</Typography>
               </Box>
               <Box sx={{ p: 2, borderRadius: 2, background: 'rgba(212,255,104,0.08)', border: '1px solid rgba(212,255,104,0.18)' }}>
                 <Typography variant="caption" color="text.secondary">После базовых расходов</Typography>
                 <Typography variant="h5" fontWeight={900}>{currency.format(estimate.margin)} ₽</Typography>
               </Box>
             </Box>
+            <Typography color="text.secondary" sx={{ mt: 2, fontSize: '0.92rem' }}>
+              {estimate.paybackMonths
+                ? `Ориентировочная окупаемость: ${estimate.paybackMonths} мес.`
+                : 'При текущем сценарии точка не выходит в положительную окупаемость.'}
+            </Typography>
           </Box>
         </Box>
 
@@ -221,7 +248,7 @@ export default function FranchisePage() {
           <Box sx={{ pt: { md: 2 } }}>
             <Chip icon={<LocationCity />} label="Заявка партнеру" sx={{ mb: 2, color: '#D4FF68', background: 'rgba(212,255,104,0.08)' }} />
             <Typography variant="h3" component="h2" fontWeight={900} sx={{ fontSize: { xs: '2rem', md: '2.65rem' }, letterSpacing: 0 }}>
-              Расскажите, где хотите открыть SoundBox
+              Расскажите, где хотите открыть AcoustiQ
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 2, lineHeight: 1.8 }}>
               Оставьте контакты, и мы обсудим формат запуска, город и подходящее количество кабинок.

@@ -428,7 +428,7 @@ export default function SoundBoxModel() {
 
   return (
     <div
-      aria-label="Интерактивная 3D-модель кабинки SoundBox"
+      aria-label="Интерактивная 3D-модель кабинки AcoustiQ"
       data-soundbox-model-ready={webglReady ? 'true' : 'fallback'}
       style={{
         position: 'relative',

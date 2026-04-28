@@ -154,10 +154,10 @@ export default function LoginPage() {
             <VolumeOff sx={{ fontSize: { xs: 32, sm: 40 }, color: 'secondary.main' }} />
           </Box>
           <Typography variant="h4" fontWeight={800} sx={{ fontSize: { xs: '1.6rem', sm: '2.125rem' }, background: 'linear-gradient(135deg, #B388FF, #00E5FF)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            SoundBox
+            AcoustiQ
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-            Звукоизолированные кабинки по Москве
+            Цифровой сервис бронирования тихих кабинок
           </Typography>
         </Box>
 

@@ -136,16 +136,16 @@ if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
 const cabinCount = db.prepare('SELECT COUNT(*) as count FROM cabins').get().count;
 if (cabinCount === 0) {
   const cabins = [
-    { name: 'SoundBox Арбат', address: 'ул. Арбат, 24', lat: 55.7520, lng: 37.5920, description: 'Уютная кабинка в самом сердце старого Арбата', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Стол и стул"]', price: 200, rating: 4.8 },
-    { name: 'SoundBox Сити', address: 'Пресненская наб., 12', lat: 55.7496, lng: 37.5377, description: 'Премиум кабинка с видом на Москва-Сити', amenities: '["Wi-Fi","Кондиционер","Монитор","USB зарядка","Кофемашина"]', price: 200, rating: 4.9 },
-    { name: 'SoundBox Парк', address: 'ул. Крымский вал, 9', lat: 55.7312, lng: 37.5958, description: 'Тихая кабинка рядом с Парком Горького', amenities: '["Wi-Fi","Кондиционер","USB зарядка"]', price: 200, rating: 4.6 },
-    { name: 'SoundBox Китай-город', address: 'ул. Маросейка, 15', lat: 55.7575, lng: 37.6369, description: 'Кабинка в историческом центре', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Стол и стул"]', price: 200, rating: 4.7 },
-    { name: 'SoundBox Белорусская', address: 'ул. Лесная, 5', lat: 55.7764, lng: 37.5933, description: 'Удобная кабинка у метро Белорусская', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Принтер"]', price: 200, rating: 4.5 },
-    { name: 'SoundBox Таганка', address: 'ул. Земляной вал, 33', lat: 55.7419, lng: 37.6536, description: 'Просторная кабинка на Таганке', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Стол и стул","Вешалка"]', price: 200, rating: 4.4 },
-    { name: 'SoundBox Полянка', address: 'ул. Большая Полянка, 30', lat: 55.7359, lng: 37.6199, description: 'Кабинка в тихом районе Полянки', amenities: '["Wi-Fi","Кондиционер","USB зарядка"]', price: 200, rating: 4.3 },
-    { name: 'SoundBox Павелецкая', address: 'ул. Зацепа, 21', lat: 55.7298, lng: 37.6383, description: 'Кабинка рядом с Павелецким вокзалом', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Стол и стул"]', price: 200, rating: 4.6 },
-    { name: 'SoundBox Менделеевская', address: 'ул. Новослободская, 16', lat: 55.7816, lng: 37.6032, description: 'Современная кабинка у метро', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Монитор"]', price: 200, rating: 4.7 },
-    { name: 'SoundBox ВДНХ', address: 'пр-т Мира, 119', lat: 55.8197, lng: 37.6399, description: 'Кабинка рядом с ВДНХ', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Стол и стул","Кофемашина"]', price: 200, rating: 4.8 },
+    { name: 'AcoustiQ Арбат', address: 'ул. Арбат, 24', lat: 55.7520, lng: 37.5920, description: 'Уютная кабинка в самом сердце старого Арбата', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Стол и стул"]', price: 200, rating: 4.8 },
+    { name: 'AcoustiQ Сити', address: 'Пресненская наб., 12', lat: 55.7496, lng: 37.5377, description: 'Премиум кабинка с видом на Москва-Сити', amenities: '["Wi-Fi","Кондиционер","Монитор","USB зарядка","Кофемашина"]', price: 200, rating: 4.9 },
+    { name: 'AcoustiQ Парк', address: 'ул. Крымский вал, 9', lat: 55.7312, lng: 37.5958, description: 'Тихая кабинка рядом с Парком Горького', amenities: '["Wi-Fi","Кондиционер","USB зарядка"]', price: 200, rating: 4.6 },
+    { name: 'AcoustiQ Китай-город', address: 'ул. Маросейка, 15', lat: 55.7575, lng: 37.6369, description: 'Кабинка в историческом центре', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Стол и стул"]', price: 200, rating: 4.7 },
+    { name: 'AcoustiQ Белорусская', address: 'ул. Лесная, 5', lat: 55.7764, lng: 37.5933, description: 'Удобная кабинка у метро Белорусская', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Принтер"]', price: 200, rating: 4.5 },
+    { name: 'AcoustiQ Таганка', address: 'ул. Земляной вал, 33', lat: 55.7419, lng: 37.6536, description: 'Просторная кабинка на Таганке', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Стол и стул","Вешалка"]', price: 200, rating: 4.4 },
+    { name: 'AcoustiQ Полянка', address: 'ул. Большая Полянка, 30', lat: 55.7359, lng: 37.6199, description: 'Кабинка в тихом районе Полянки', amenities: '["Wi-Fi","Кондиционер","USB зарядка"]', price: 200, rating: 4.3 },
+    { name: 'AcoustiQ Павелецкая', address: 'ул. Зацепа, 21', lat: 55.7298, lng: 37.6383, description: 'Кабинка рядом с Павелецким вокзалом', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Стол и стул"]', price: 200, rating: 4.6 },
+    { name: 'AcoustiQ Менделеевская', address: 'ул. Новослободская, 16', lat: 55.7816, lng: 37.6032, description: 'Современная кабинка у метро', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Монитор"]', price: 200, rating: 4.7 },
+    { name: 'AcoustiQ ВДНХ', address: 'пр-т Мира, 119', lat: 55.8197, lng: 37.6399, description: 'Кабинка рядом с ВДНХ', amenities: '["Wi-Fi","Кондиционер","USB зарядка","Стол и стул","Кофемашина"]', price: 200, rating: 4.8 },
   ];
 
   const insert = db.prepare(`
@@ -166,10 +166,20 @@ if (partnerCount === 0) {
     INSERT INTO partners (name, city, contact_name, email, phone)
     VALUES (?, ?, ?, ?, ?)
   `);
-  insertPartner.run('SoundBox Центр', 'Москва', 'Анна Смирнова', 'center@soundbox.test', '+7 900 100-10-10');
-  insertPartner.run('SoundBox Campus', 'Москва', 'Илья Орлов', 'campus@soundbox.test', '+7 900 200-20-20');
-  insertPartner.run('SoundBox Transit', 'Москва', 'Мария Волкова', 'transit@soundbox.test', '+7 900 300-30-30');
+  insertPartner.run('AcoustiQ Центр', 'Москва', 'Анна Смирнова', 'center@soundbox.test', '+7 900 100-10-10');
+  insertPartner.run('AcoustiQ Campus', 'Москва', 'Илья Орлов', 'campus@soundbox.test', '+7 900 200-20-20');
+  insertPartner.run('AcoustiQ Transit', 'Москва', 'Мария Волкова', 'transit@soundbox.test', '+7 900 300-30-30');
 }
+
+db.exec(`
+  UPDATE cabins
+  SET name = REPLACE(name, 'SoundBox', 'AcoustiQ')
+  WHERE name LIKE 'SoundBox%';
+
+  UPDATE partners
+  SET name = REPLACE(name, 'SoundBox', 'AcoustiQ')
+  WHERE name LIKE 'SoundBox%';
+`);
 
 const cabinPartnerCount = db.prepare('SELECT COUNT(*) as count FROM cabin_partners').get().count;
 if (cabinPartnerCount === 0) {

@@ -461,7 +461,7 @@ function WalletCard({ user, wallet, onTopUp }) {
       <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'flex-start', mb: 2 }}>
           <Box>
-            <Typography variant="subtitle2" color="text.secondary">Кошелёк SoundBox</Typography>
+            <Typography variant="subtitle2" color="text.secondary">Кошелёк AcoustiQ</Typography>
             <Typography variant="h4" fontWeight={800} sx={{ color: 'secondary.main', mt: 0.5 }}>
               {user?.balance || 0} ₽
             </Typography>
@@ -792,7 +792,7 @@ export default function DashboardPage() {
           <CardContent sx={{ p: { xs: 2, sm: 3 }, position: 'relative' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <VolumeOff sx={{ color: 'secondary.main' }} />
-              <Typography variant="h6" fontWeight={700}>SoundBox</Typography>
+              <Typography variant="h6" fontWeight={700}>AcoustiQ</Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2, lineHeight: 1.8, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
               Забронируйте звукоизолированную кабинку для работы, звонков или отдыха.
